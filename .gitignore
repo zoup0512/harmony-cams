@@ -37,7 +37,3 @@ yarn.lock
 Thumbs.db
 *.swp
 *.swo
-
-# 脚本文件（可能含敏感信息）
-harmony_push*.bat
-harmony_push*.sh
