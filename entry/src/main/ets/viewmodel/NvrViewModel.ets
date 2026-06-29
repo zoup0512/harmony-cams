@@ -1,0 +1,638 @@
+import { common, Want } from '@kit.AbilityKit';
+import { promptAction } from '@kit.ArkUI';
+import { CameraDevice, createCameraDevice } from '../model/CameraDevice';
+import { RecordingFile, createRecordingFile } from '../model/RecordingFile';
+import { DatabaseHelper } from '../utils/DatabaseHelper';
+import { StorageManager } from '../utils/StorageManager';
+import { VideoStreamManager } from '../utils/VideoStreamManager';
+import { PrefStore } from '../utils/PrefStore';
+import {
+  DeviceFlowStep, VerificationPreview, PlaybackStreamType,
+  buildPlaybackUrl, defaultPlaybackPort, parsePlaybackUrl, sanitizePlaybackUrl,
+  playbackStreamTypeFromScheme, playbackStreamTypeFromUrl,
+  buildDeviceManageFormValue, emptyDeviceManageFormValue,
+  copyCameraPreferences, clearCameraPreferences,
+  enrichCameraRtspUrl, cameraBadge, DeviceManageFormValue,
+} from '../utils/PlaybackModels';
+import {
+  NvrUiState, defaultUiState, NvrPlaybackState, NvrDeviceFormState,
+  NvrSettingsState, defaultSettingsState, defaultDeviceFormState, defaultPlaybackState,
+} from './NvrUiState';
+import { AppearanceThemeState } from '../theme/NvrTheme';
+
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+export class NvrViewModel {
+  private context: common.Context;
+  dbHelper: DatabaseHelper;
+  storageManager: StorageManager;
+  streamManager: VideoStreamManager;
+  prefs: PrefStore;
+
+  cameras: CameraDevice[] = [];
+  recordings: RecordingFile[] = [];
+  snapshots: RecordingFile[] = [];
+  filteredCameras: CameraDevice[] = [];
+  cameraGroups: string[] = [];
+
+  uiState: NvrUiState = defaultUiState();
+
+  constructor(context: common.Context) {
+    this.context = context;
+    this.dbHelper = new DatabaseHelper(context);
+    this.storageManager = new StorageManager(context);
+    this.streamManager = VideoStreamManager.getInstance(context);
+    this.prefs = new PrefStore(context);
+  }
+
+  async init(): Promise<void> {
+    await this.dbHelper.init();
+    await this.prefs.init();
+
+    const savedStoragePath = await this.prefs.getString('storage_path', '');
+    const initialStorage = savedStoragePath && savedStoragePath.trim() !== '' && savedStoragePath !== '/sdcard/NVR'
+      ? savedStoragePath
+      : this.context.filesDir;
+
+    this.uiState.settings = {
+        storagePathInput: initialStorage,
+        recordingQualityInput: await this.prefs.getString('recording_quality', '1080p'),
+        recordingDurationInput: await this.prefs.getString('recording_duration', '30'),
+        rtmpUrlInput: await this.prefs.getString('rtmp_push_url', ''),
+        rtmpStreamKeyInput: await this.prefs.getString('rtmp_push_stream_key', ''),
+        rtmpUsernameInput: await this.prefs.getString('rtmp_push_username', ''),
+        rtmpPasswordInput: await this.prefs.getString('rtmp_push_password', ''),
+        rtmpAudioEnabled: await this.prefs.getBoolean('rtmp_push_audio_enabled', true),
+        rtmpAutoStreamEnabled: await this.prefs.getBoolean('rtmp_auto_stream', false),
+        appearanceThemeMode: await this.prefs.getString('appearance_theme_mode', 'light'),
+      };
+
+    AppearanceThemeState.initFromPrefs(this.uiState.settings.appearanceThemeMode);
+
+    this.uiState.appLockEnabled = await this.prefs.getBoolean('app_lock_enabled', false);
+    this.uiState.isAppLocked = this.uiState.appLockEnabled;
+
+    await this.addDefaultCameraIfNeeded();
+    await this.reloadCameras();
+    await this.reloadRecordings();
+    await this.reloadSnapshots();
+    await this.checkCameraHealth();
+  }
+
+  private async addDefaultCameraIfNeeded(): Promise<void> {
+    try {
+      const count = await this.dbHelper.getCamerasCount();
+      if (count === 0) {
+        const defaultCamera = createCameraDevice(generateUUID(), '默认摄像头', '');
+        await this.dbHelper.addCamera(defaultCamera);
+      }
+    } catch (e) {
+      console.error(`addDefaultCameraIfNeeded failed: ${(e as Error).message}`);
+    }
+  }
+
+  async reloadCameras(): Promise<void> {
+    this.cameras = await this.dbHelper.getAllCameras();
+    this.updateFilteredCameras();
+    this.updateCameraGroups();
+    if (this.uiState.selectedCameraIndex >= this.cameras.length) {
+      this.uiState.selectedCameraIndex = 0;
+    }
+  }
+
+  private updateFilteredCameras(): void {
+    const query = this.uiState.searchQuery?.toLowerCase() ?? '';
+    const filter = this.uiState.cameraFilter ?? 'all';
+    this.filteredCameras = this.cameras.filter(c => {
+      if (query && !c.name.toLowerCase().includes(query) && !c.rtspUrl.toLowerCase().includes(query)) {
+        return false;
+      }
+      if (filter === 'online' && !c.isConnected) return false;
+      if (filter === 'offline' && c.isConnected) return false;
+      return true;
+    });
+  }
+
+  private updateCameraGroups(): void {
+    const groups = new Set<string>();
+    for (const c of this.cameras) {
+      if (c.group && c.group.trim() !== '') {
+        groups.add(c.group.trim());
+      }
+    }
+    this.cameraGroups = Array.from(groups).sort();
+  }
+
+  setSearchQuery(query: string): void {
+    this.uiState.searchQuery = query;
+    this.updateFilteredCameras();
+  }
+
+  setCameraFilter(filter: 'all' | 'online' | 'offline'): void {
+    this.uiState.cameraFilter = filter;
+    this.updateFilteredCameras();
+  }
+
+  async reorderCamera(fromIndex: number, toIndex: number): Promise<void> {
+    if (fromIndex < 0 || fromIndex >= this.cameras.length) return;
+    if (toIndex < 0 || toIndex >= this.cameras.length) return;
+    const moved = this.cameras[fromIndex];
+    const remaining = [...this.cameras];
+    remaining.splice(fromIndex, 1);
+    remaining.splice(toIndex, 0, moved);
+    for (let i = 0; i < remaining.length; i++) {
+      remaining[i].sortOrder = i;
+      await this.dbHelper.updateCamera(remaining[i]);
+    }
+    this.cameras = remaining;
+    this.updateFilteredCameras();
+  }
+
+  async setCameraGroup(cameraId: string, group: string): Promise<void> {
+    const camera = this.cameras.find(c => c.id === cameraId);
+    if (!camera) return;
+    camera.group = group;
+    await this.dbHelper.updateCamera(camera);
+    this.updateCameraGroups();
+    this.updateFilteredCameras();
+  }
+
+  async checkCameraHealth(): Promise<void> {
+    for (const camera of this.cameras) {
+      if (camera.rtspUrl === '') {
+        camera.isConnected = false;
+        camera.connectionQuality = 'unknown';
+        continue;
+      }
+      try {
+        const parsed = parsePlaybackUrl(camera.rtspUrl);
+        if (parsed.host === '') {
+          camera.isConnected = false;
+          camera.connectionQuality = 'unknown';
+          continue;
+        }
+        camera.isConnected = true;
+        camera.lastSeen = Date.now();
+        camera.connectionQuality = 'good';
+      } catch {
+        camera.isConnected = false;
+        camera.connectionQuality = 'poor';
+      }
+    }
+    this.updateFilteredCameras();
+  }
+
+  async reloadRecordings(): Promise<void> {
+    this.recordings = this.storageManager.getAllRecordings();
+  }
+
+  async reloadSnapshots(): Promise<void> {
+    const rootPath = this.uiState.settings.storagePathInput.trim() || this.context.filesDir;
+    this.snapshots = this.storageManager.getAllSnapshots(rootPath);
+  }
+
+  getCameraBadge(camera: CameraDevice): string {
+    return cameraBadge(camera, '');
+  }
+
+  async getCameraBadgeAsync(camera: CameraDevice): Promise<string> {
+    const vendor = await this.prefs.getString(`camera_vendor_${camera.id}`, '');
+    return cameraBadge(camera, vendor);
+  }
+
+  /* Playback */
+  async clearPlaybackState(): Promise<void> {
+    if (this.uiState.playback.isRecording) {
+      this.uiState.playback.isRecording = false;
+    }
+    await this.streamManager.stopStream();
+    this.uiState.playback.playingCameraId = null;
+    this.uiState.playback.pendingPlaybackCamera = null;
+    this.uiState.playback.pendingPlaybackRequestId = 0;
+    this.uiState.playback.adHocPlaybackCamera = null;
+    this.uiState.playback.isVideoReady = false;
+  }
+
+  queuePlayback(cameraToPlay: CameraDevice): void {
+    this.uiState.playback.lastRequestedPlaybackCameraId = cameraToPlay.id;
+    this.uiState.playback.pendingPlaybackCamera = createCameraDevice(
+      cameraToPlay.id, cameraToPlay.name, cameraToPlay.rtspUrl,
+      cameraToPlay.isRecording, false,
+      cameraToPlay.group ?? '', cameraToPlay.sortOrder ?? 0,
+    );
+    this.uiState.playback.pendingPlaybackRequestId = this.uiState.playback.pendingPlaybackRequestId + 1;
+  }
+
+  rememberLastRequestedPlayback(cameraId: string): void {
+    this.uiState.playback.lastRequestedPlaybackCameraId = cameraId;
+  }
+
+  queuePendingPlaybackResume(cameraToResume: CameraDevice): void {
+    this.uiState.playback.pendingPlaybackCamera = createCameraDevice(
+      cameraToResume.id, cameraToResume.name, cameraToResume.rtspUrl,
+      cameraToResume.isRecording, false,
+      cameraToResume.group ?? '', cameraToResume.sortOrder ?? 0,
+    );
+    this.uiState.playback.pendingPlaybackRequestId = this.uiState.playback.pendingPlaybackRequestId + 1;
+  }
+
+  clearPendingPlaybackRequest(): void {
+    this.uiState.playback.pendingPlaybackCamera = null;
+    this.uiState.playback.pendingPlaybackRequestId = 0;
+  }
+
+  async playAdHocUrl(title: string, url: string): Promise<void> {
+    const friendlyName = title || '临时播放';
+    const safeId = `adhoc_${generateUUID()}`;
+    const adhoc = createCameraDevice(safeId, friendlyName, url);
+    await this.clearPlaybackState();
+    const previousTab = this.uiState.selectedTab;
+    this.uiState.selectedTab = 0;
+    this.uiState.playback.adHocPlaybackCamera = adhoc;
+    this.uiState.playback.tabBeforeFullscreen = previousTab;
+    this.uiState.playback.isPlaybackFullscreen = true;
+    this.queuePlayback(adhoc);
+  }
+
+  async startPlayback(cameraToPlay: CameraDevice): Promise<void> {
+    await this.clearPlaybackState();
+    cameraToPlay.isConnected = false;
+
+    const player = await this.streamManager.startStream(cameraToPlay);
+    this.uiState.playback.pendingPlaybackCamera = null;
+
+    if (!player) {
+      const diagnosis = this.streamManager.getLastDiagnosticMessage();
+      promptAction.showToast({ message: `拉流失败：${diagnosis}` });
+      return;
+    }
+
+    this.uiState.playback.playingCameraId = cameraToPlay.id;
+    this.uiState.playback.lastRequestedPlaybackCameraId = cameraToPlay.id;
+    this.streamManager.setVolume(this.uiState.playback.lastNonZeroVolume);
+    promptAction.showToast({ message: '开始播放' });
+  }
+
+  /* Recording */
+  async toggleRecording(): Promise<void> {
+    if (!this.uiState.playback.playingCameraId) {
+      promptAction.showToast({ message: '当前没有可控制的播放' });
+      return;
+    }
+    if (this.uiState.playback.isRecording) {
+      this.uiState.playback.isRecording = false;
+      promptAction.showToast({ message: '停止录制' });
+    } else {
+      this.uiState.playback.isRecording = true;
+      promptAction.showToast({ message: '开始录制' });
+    }
+  }
+
+  /* Device Management */
+  async loadSelectedDeviceToForm(device: CameraDevice | null): Promise<void> {
+    const formValue = device
+      ? await buildDeviceManageFormValue(device, this.prefs)
+      : emptyDeviceManageFormValue();
+    this.uiState.deviceForm.selectedDeviceId = formValue.selectedDeviceId;
+    this.uiState.deviceForm.manageName = formValue.manageName;
+    this.uiState.deviceForm.manageVendor = formValue.manageVendor;
+    this.uiState.deviceForm.manageProfile = formValue.manageProfile;
+    this.uiState.deviceForm.manageStreamScheme = formValue.manageStreamScheme;
+    this.uiState.deviceForm.manageStreamPath = formValue.manageStreamPath;
+    this.uiState.deviceForm.manageHost = formValue.manageHost;
+    this.uiState.deviceForm.managePort = formValue.managePort;
+    this.uiState.deviceForm.manageLoginEnabled = formValue.manageLoginEnabled;
+    this.uiState.deviceForm.manageUsername = formValue.manageUsername;
+    this.uiState.deviceForm.managePassword = formValue.managePassword;
+    this.uiState.deviceForm.managePasswordVisible = formValue.managePasswordVisible;
+    this.uiState.deviceForm.forceHttpSoftwareDecode = formValue.forceHttpSoftwareDecode;
+  }
+
+  openAddLanding(): void {
+    this.uiState.selectedTab = 5;
+    this.uiState.deviceForm.verificationResult = null;
+    this.uiState.deviceForm.deviceFlowStep = DeviceFlowStep.Landing;
+    this.uiState.deviceForm.selectedDeviceId = null;
+  }
+
+  async openEditForm(device: CameraDevice | null): Promise<void> {
+    await this.loadSelectedDeviceToForm(device);
+    this.uiState.selectedTab = 5;
+    this.uiState.deviceForm.verificationResult = null;
+    this.uiState.deviceForm.deviceFlowStep = DeviceFlowStep.Form;
+  }
+
+  async duplicateCamera(device: CameraDevice): Promise<void> {
+    const copied = createCameraDevice(
+      generateUUID(),
+      `${device.name} 副本`,
+      device.rtspUrl,
+      device.isRecording,
+      device.isConnected,
+      device.group ?? '',
+      device.sortOrder ?? 0,
+    );
+    const ok = await this.dbHelper.addCamera(copied);
+    if (ok) {
+      await copyCameraPreferences(
+        this.prefs, device.id, copied.id,
+        this.uiState.deviceForm.manageVendor,
+        this.uiState.deviceForm.manageProfile,
+        this.uiState.deviceForm.manageLoginEnabled,
+        this.uiState.deviceForm.manageUsername,
+        this.uiState.deviceForm.managePassword,
+      );
+      await this.reloadCameras();
+      const idx = this.cameras.findIndex(c => c.id === copied.id);
+      if (idx >= 0) {
+      this.uiState.selectedCameraIndex = idx;
+      }
+    }
+    promptAction.showToast({ message: ok ? '已复制相机' : '复制失败' });
+  }
+
+  async deleteCamera(device: CameraDevice): Promise<void> {
+    const isPlayingCurrent = this.uiState.playback.playingCameraId === device.id;
+    if (isPlayingCurrent) {
+      await this.clearPlaybackState();
+      this.uiState.playback.lastRequestedPlaybackCameraId = null;
+      this.uiState.playback.isPlaybackFullscreen = false;
+    }
+    const ok = await this.dbHelper.deleteCamera(device.id);
+    if (ok) {
+      await clearCameraPreferences(this.prefs, device.id);
+      await this.reloadCameras();
+    }
+    promptAction.showToast({ message: ok ? '删除相机成功' : '删除相机失败' });
+    const next = this.cameras.find(c => c.id !== device.id);
+    await this.loadSelectedDeviceToForm(next ?? null);
+  }
+
+  /* Simple state setters */
+  onSelectedTabChange(tab: number): void {
+    this.uiState.selectedTab = tab;
+  }
+
+  onLongPressedCameraIdChange(id: string | null): void {
+    this.uiState.longPressedCameraId = id;
+  }
+
+  onSelectedCameraIndexChange(index: number): void {
+    this.uiState.selectedCameraIndex = index;
+  }
+
+  onPlaybackFullscreenChange(fullscreen: boolean): void {
+    this.uiState.playback.isPlaybackFullscreen = fullscreen;
+  }
+
+  onVideoLayoutRefChange(surfaceId: string | null): void {
+    this.streamManager.setSurfaceId(surfaceId);
+  }
+
+  onCurrentPlayerPlay(): void {
+    this.streamManager.play();
+  }
+
+  onCurrentPlayerPause(): void {
+    this.streamManager.pause();
+  }
+
+  onCurrentPlayerSetVolume(volume: number): void {
+    this.streamManager.setVolume(volume);
+  }
+
+  onLastNonZeroVolumeChange(volume: number): void {
+    this.uiState.playback.lastNonZeroVolume = volume;
+  }
+
+  /* Device form fields */
+  onManageNameChange(v: string): void {
+    this.uiState.deviceForm.manageName = v;
+  }
+  onManageStreamSchemeChange(v: string): void {
+    this.uiState.deviceForm.manageStreamScheme = v;
+  }
+  onManageHostChange(v: string): void {
+    this.uiState.deviceForm.manageHost = v;
+  }
+  onManagePortChange(v: string): void {
+    this.uiState.deviceForm.managePort = v;
+  }
+  onManageStreamPathChange(v: string): void {
+    this.uiState.deviceForm.manageStreamPath = v;
+  }
+  onManageLoginEnabledChange(v: boolean): void {
+    this.uiState.deviceForm.manageLoginEnabled = v;
+  }
+  onManageUsernameChange(v: string): void {
+    this.uiState.deviceForm.manageUsername = v;
+  }
+  onManagePasswordChange(v: string): void {
+    this.uiState.deviceForm.managePassword = v;
+  }
+  onManagePasswordVisibleChange(v: boolean): void {
+    this.uiState.deviceForm.managePasswordVisible = v;
+  }
+  onForceHttpSoftwareDecodeChange(v: boolean): void {
+    this.uiState.deviceForm.forceHttpSoftwareDecode = v;
+  }
+  onVerificationResultChange(v: VerificationPreview | null): void {
+    this.uiState.deviceForm.verificationResult = v;
+  }
+  onDeviceFlowStepChange(v: DeviceFlowStep): void {
+    this.uiState.deviceForm.deviceFlowStep = v;
+  }
+
+  /* Settings fields */
+  async onStoragePathChange(v: string): Promise<void> {
+    this.uiState.settings.storagePathInput = v;
+    await this.prefs.putString('storage_path', v.trim());
+  }
+  async onRecordingQualityChange(v: string): Promise<void> {
+    this.uiState.settings.recordingQualityInput = v;
+    await this.prefs.putString('recording_quality', v.trim());
+  }
+  async onRecordingDurationChange(v: string): Promise<void> {
+    this.uiState.settings.recordingDurationInput = v;
+    await this.prefs.putString('recording_duration', v.trim());
+  }
+  async onRtmpUrlChange(v: string): Promise<void> {
+    this.uiState.settings.rtmpUrlInput = v;
+    await this.prefs.putString('rtmp_push_url', v.trim());
+  }
+  async onRtmpStreamKeyChange(v: string): Promise<void> {
+    this.uiState.settings.rtmpStreamKeyInput = v;
+    await this.prefs.putString('rtmp_push_stream_key', v.trim());
+  }
+  async onRtmpUsernameChange(v: string): Promise<void> {
+    this.uiState.settings.rtmpUsernameInput = v;
+    await this.prefs.putString('rtmp_push_username', v.trim());
+  }
+  async onRtmpPasswordChange(v: string): Promise<void> {
+    this.uiState.settings.rtmpPasswordInput = v;
+    await this.prefs.putString('rtmp_push_password', v);
+  }
+  async onRtmpAudioEnabledChange(v: boolean): Promise<void> {
+    this.uiState.settings.rtmpAudioEnabled = v;
+    await this.prefs.putBoolean('rtmp_push_audio_enabled', v);
+  }
+  async onRtmpAutoStreamChange(v: boolean): Promise<void> {
+    this.uiState.settings.rtmpAutoStreamEnabled = v;
+    await this.prefs.putBoolean('rtmp_auto_stream', v);
+  }
+  async onAppearanceThemeModeChange(v: string): Promise<void> {
+    this.uiState.settings.appearanceThemeMode = v;
+    await this.prefs.putString('appearance_theme_mode', v);
+    AppearanceThemeState.update(v);
+  }
+
+  /* Dialogs */
+  onCurrentRecordingDialogChange(file: RecordingFile | null): void {
+    this.uiState.currentRecordingDialog = file;
+  }
+  onPendingDeleteSnapshotChange(file: RecordingFile | null): void {
+    this.uiState.pendingDeleteSnapshot = file;
+  }
+
+  /* Save verified device */
+  async saveVerifiedDevice(): Promise<boolean> {
+    const result = this.uiState.deviceForm.verificationResult;
+    if (!result) return false;
+    const editingDeviceId = this.uiState.deviceForm.selectedDeviceId;
+    const targetDevice = createCameraDevice(
+      editingDeviceId ?? generateUUID(),
+      this.uiState.deviceForm.manageName.trim() || result.name,
+      result.primaryUrl,
+    );
+    const success = editingDeviceId
+      ? (await this.dbHelper.updateCamera(targetDevice)) > 0
+      : await this.dbHelper.addCamera(targetDevice);
+
+    if (success) {
+      await this.prefs.putString(`camera_vendor_${targetDevice.id}`,
+        this.uiState.deviceForm.manageVendor.trim() || 'IPCams');
+      await this.prefs.putString(`camera_profile_${targetDevice.id}`,
+        this.uiState.deviceForm.manageProfile.trim());
+      await this.prefs.putBoolean(`camera_login_enabled_${targetDevice.id}`,
+        this.uiState.deviceForm.manageLoginEnabled);
+      await this.prefs.putString(`camera_username_${targetDevice.id}`,
+        this.uiState.deviceForm.manageUsername.trim());
+      await this.prefs.putString(`camera_password_${targetDevice.id}`,
+        this.uiState.deviceForm.managePassword);
+      await this.prefs.putBoolean(`camera_force_http_software_decode_${targetDevice.id}`,
+        this.uiState.deviceForm.forceHttpSoftwareDecode);
+
+      await this.reloadCameras();
+      await this.loadSelectedDeviceToForm(targetDevice);
+      const idx = this.cameras.findIndex(c => c.id === targetDevice.id);
+      this.uiState.selectedCameraIndex = idx >= 0 ? idx : 0;
+      this.uiState.selectedTab = 0;
+      this.uiState.deviceForm.deviceFlowStep = DeviceFlowStep.Landing;
+      this.uiState.deviceForm.verificationResult = null;
+    }
+    promptAction.showToast({
+      message: success ? '保存成功'
+        : (editingDeviceId ? '更新失败' : '保存失败'),
+    });
+    return success;
+  }
+
+  /* Submit form -> verification */
+  submitFormToVerification(): void {
+    const d = this.uiState.deviceForm;
+    const name = d.manageName.trim() || 'IPCams';
+    const host = d.manageHost.trim();
+    const port = d.managePort.trim();
+    const path = d.manageStreamPath.trim() || 'stream1';
+    const selectedScheme = playbackStreamTypeFromScheme(d.manageStreamScheme) ?? PlaybackStreamType.RTSP;
+
+    if (host === '') {
+      promptAction.showToast({ message: '请填写主机/IP' });
+      return;
+    }
+    if (port !== '' && !/^\d+$/.test(port)) {
+      promptAction.showToast({ message: '端口格式不正确' });
+      return;
+    }
+
+    const playbackUrl = buildPlaybackUrl(
+      selectedScheme, host, port || defaultPlaybackPort(selectedScheme), path,
+      d.manageLoginEnabled, d.manageUsername, d.managePassword,
+    );
+
+    this.onManageNameChange(name);
+    const preview: VerificationPreview = {
+      name,
+      primaryUrl: playbackUrl,
+      streamScheme: selectedScheme as string,
+      host,
+      port: port || defaultPlaybackPort(selectedScheme),
+      resolution: '2560x1440',
+      codec: 'hevc',
+      streamPath: path,
+    };
+    this.onVerificationResultChange(preview);
+    this.onDeviceFlowStepChange(DeviceFlowStep.Verifying);
+  }
+
+  async clearRecordings(): Promise<void> {
+    const allFiles = this.storageManager.getAllRecordings();
+    let deleted = 0;
+    for (const file of allFiles) {
+      if (this.storageManager.deleteFile(file.filePath)) deleted++;
+    }
+    promptAction.showToast({ message: `已清理 ${deleted} / ${allFiles.length} 个文件` });
+    await this.reloadRecordings();
+  }
+
+  async shutdown(): Promise<void> {
+    await this.clearPlaybackState();
+    await this.streamManager.shutdown();
+  }
+
+  /* App Lock */
+  async verifyPin(pin: string): Promise<boolean> {
+    const storedPin = await this.prefs.getString('app_lock_pin', '');
+    if (storedPin === pin) {
+      this.uiState.isAppLocked = false;
+      return true;
+    }
+    return false;
+  }
+
+  async setAppLock(enabled: boolean, pin: string = ''): Promise<void> {
+    this.uiState.appLockEnabled = enabled;
+    await this.prefs.putBoolean('app_lock_enabled', enabled);
+    if (enabled && pin !== '') {
+      await this.prefs.putString('app_lock_pin', pin);
+    }
+  }
+
+  lockApp(): void {
+    if (this.uiState.appLockEnabled) {
+      this.uiState.isAppLocked = true;
+    }
+  }
+
+  /* Share snapshot */
+  async shareSnapshot(filePath: string): Promise<void> {
+    try {
+      const context = this.context as common.UIAbilityContext;
+      const fileUri = `file://${filePath}`;
+      const want: Want = {
+        action: 'ohos.want.action.sendData',
+        type: 'image/*',
+        uri: fileUri,
+      };
+      context.startAbility(want);
+    } catch (e) {
+      promptAction.showToast({ message: '分享失败' });
+    }
+  }
+}

@@ -1,0 +1,750 @@
+import { common } from '@kit.AbilityKit';
+import { promptAction } from '@kit.ArkUI';
+import { CameraDevice } from '../model/CameraDevice';
+import { RecordingFile } from '../model/RecordingFile';
+import { NvrViewModel } from '../viewmodel/NvrViewModel';
+import { DeviceFlowStep, VerificationPreview, PlaybackStreamType, sanitizePlaybackUrl, buildPlaybackUrl, defaultPlaybackPort, playbackStreamTypeFromScheme, enrichCameraRtspUrl, cameraBadge, snapshotCameraKey } from '../utils/PlaybackModels';
+import { NvrColors, getColors, AppearanceThemeState } from '../theme/NvrTheme';
+import { NvrMainTopBar, NvrBottomBar, CameraHomeScreen, PlaybackFullscreenScreen, CameraActionOverlay } from '../components/NvrShellComponents';
+import { DeviceManageTopBar, AddCameraLandingScreen, AddCameraFormScreen, AddCameraVerificationScreen } from '../components/DeviceManageComponents';
+import { BrowseScreen } from '../components/BrowseScreen';
+import { ActivityStreamScreen, SnapshotScreen, SettingsHomeScreen } from '../components/NvrSecondaryScreens';
+import { RecordingPreviewDialog, DeleteSnapshotConfirmDialog } from '../components/NvrDialogComponents';
+import { NvrUiState, copyUiState } from '../viewmodel/NvrUiState';
+
+@Entry
+@Component
+struct MainPage {
+  private vm: NvrViewModel | null = null;
+  @State uiState: NvrUiState = {
+    selectedTab: 0,
+    selectedCameraIndex: 0,
+    longPressedCameraId: null,
+    currentRecordingDialog: null,
+    pendingDeleteSnapshot: null,
+    playback: {
+      playingCameraId: null,
+      lastRequestedPlaybackCameraId: null,
+      isPlaybackFullscreen: false,
+      pendingPlaybackCamera: null,
+      pendingPlaybackRequestId: 0,
+      lastNonZeroVolume: 100,
+      isRecording: false,
+      adHocPlaybackCamera: null,
+      tabBeforeFullscreen: 0,
+      isVideoReady: false,
+    },
+    deviceForm: {
+      selectedDeviceId: null,
+      manageName: '',
+      manageVendor: '',
+      manageProfile: '',
+      manageStreamScheme: 'rtsp',
+      manageStreamPath: 'stream1',
+      manageHost: '',
+      managePort: '',
+      manageLoginEnabled: true,
+      manageUsername: '',
+      managePassword: '',
+      managePasswordVisible: false,
+      forceHttpSoftwareDecode: false,
+      deviceFlowStep: 'Landing' as DeviceFlowStep,
+      verificationResult: null,
+    },
+    settings: {
+      storagePathInput: '',
+      recordingQualityInput: '1080p',
+      recordingDurationInput: '30',
+      rtmpUrlInput: '',
+      rtmpStreamKeyInput: '',
+      rtmpUsernameInput: '',
+      rtmpPasswordInput: '',
+      rtmpAudioEnabled: true,
+      rtmpAutoStreamEnabled: false,
+      appearanceThemeMode: 'light',
+    },
+  };
+  @State cameras: CameraDevice[] = [];
+  @State snapshots: RecordingFile[] = [];
+  @State recordings: RecordingFile[] = [];
+  @State colors: NvrColors = getColors('light', 'light');
+  @State isVlcAvailable: boolean = true;
+  @State playbackControlPlaying: boolean = false;
+  @State controlsVisible: boolean = true;
+  @State isVideoReady: boolean = false;
+  @State surfaceId: string = '';
+  @State isMuted: boolean = false;
+  @State lastNonZeroVolume: number = 100;
+  @State searchQuery: string = '';
+  @State cameraFilter: string = 'all';
+  @State isAppLocked: boolean = false;
+  @State pinInput: string = '';
+  private pollTimerId: number = -1;
+  private controlsTimerId: number = -1;
+  private videoPollTimerId: number = -1;
+
+  aboutToAppear(): void {
+    const context = this.getUIContext().getHostContext() as common.Context;
+    this.vm = new NvrViewModel(context);
+    this.initVm();
+  }
+
+  aboutToDisappear(): void {
+    if (this.pollTimerId !== -1) clearTimeout(this.pollTimerId);
+    if (this.controlsTimerId !== -1) clearTimeout(this.controlsTimerId);
+    if (this.videoPollTimerId !== -1) clearTimeout(this.videoPollTimerId);
+    if (this.vm) {
+      this.vm.shutdown();
+    }
+  }
+
+  onPageShow(): void {
+    // page becomes visible
+  }
+
+  onPageHide(): void {
+    if (this.vm && this.uiState.playback.playingCameraId) {
+      this.vm.prefs.getBoolean('allow_background_playback', false).then((allowed: boolean) => {
+        if (!allowed) {
+          this.vm!.clearPlaybackState().then(() => this.syncState());
+        }
+      });
+    }
+    if (this.vm) {
+      this.vm.lockApp();
+      this.syncState();
+    }
+  }
+
+  private async initVm(): Promise<void> {
+    if (!this.vm) return;
+    await this.vm.init();
+    this.syncState();
+    this.startPlaybackPolling();
+  }
+
+  private startPlaybackPolling(): void {
+    if (this.pollTimerId !== -1) clearTimeout(this.pollTimerId);
+    this.pollTimerId = setInterval(() => {
+      this.pollPlaybackState();
+    }, 250);
+    // Health check every 30 seconds
+    setInterval(() => {
+      if (this.vm) {
+        this.vm.checkCameraHealth().then(() => this.syncState());
+      }
+    }, 30000);
+  }
+
+  private pollPlaybackState(): void {
+    if (!this.vm) return;
+    const p = this.uiState.playback;
+    if (p.isPlaybackFullscreen && p.playingCameraId) {
+      const playing = this.vm.streamManager.isPlaying();
+      if (playing !== this.playbackControlPlaying) {
+        this.playbackControlPlaying = playing;
+      }
+      const hasVideo = this.vm.streamManager.hasVideoOutputFlag();
+      if (hasVideo && !this.isVideoReady) {
+        this.isVideoReady = true;
+      }
+    } else {
+      this.playbackControlPlaying = false;
+      this.isVideoReady = false;
+    }
+
+    // Handle pending playback request
+    const pendingCam = this.uiState.playback.pendingPlaybackCamera;
+    const pendingReqId = this.uiState.playback.pendingPlaybackRequestId;
+    if (pendingCam && pendingReqId > 0 && this.surfaceId !== '' && this.uiState.selectedTab === 0) {
+      this.vm.startPlayback(pendingCam).then(() => {
+        this.syncState();
+      });
+    }
+
+    // Auto-resume playback when returning to camera tab
+    if (this.uiState.selectedTab === 0 && !p.playingCameraId && !p.pendingPlaybackCamera && !p.isPlaybackFullscreen) {
+      const resumeId = p.lastRequestedPlaybackCameraId;
+      if (resumeId) {
+        const cam = this.cameras.find(c => c.id === resumeId);
+        if (cam) {
+          this.vm.queuePendingPlaybackResume(cam);
+          this.syncState();
+        }
+      }
+    }
+  }
+
+  private syncState(): void {
+    if (!this.vm) return;
+    this.uiState = copyUiState(this.vm.uiState);
+    this.cameras = [...this.vm.cameras];
+    this.snapshots = [...this.vm.snapshots];
+    this.recordings = [...this.vm.recordings];
+    this.colors = getColors(this.vm.uiState.settings.appearanceThemeMode,
+      this.vm.uiState.settings.appearanceThemeMode === 'dark' ? 'dark' : 'light');
+    this.searchQuery = this.vm.uiState.searchQuery ?? '';
+    this.cameraFilter = this.vm.uiState.cameraFilter ?? 'all';
+    this.isAppLocked = this.vm.uiState.isAppLocked ?? false;
+  }
+
+  private getSelectedCameraForGrid(): CameraDevice | null {
+    return this.cameras[this.uiState.selectedCameraIndex] ?? null;
+  }
+
+  private getCameraInAction(): CameraDevice | null {
+    return this.cameras.find(c => c.id === this.uiState.longPressedCameraId) ?? null;
+  }
+
+  private getFullscreenCamera(): CameraDevice | null {
+    const targetId = this.uiState.playback.playingCameraId ?? this.uiState.playback.lastRequestedPlaybackCameraId;
+    if (this.uiState.playback.adHocPlaybackCamera && this.uiState.playback.adHocPlaybackCamera.id === targetId) {
+      return this.uiState.playback.adHocPlaybackCamera;
+    }
+    return this.cameras.find(c => c.id === targetId) ?? null;
+  }
+
+  build(): void {
+    if (this.isAppLocked) {
+      this.AppLockScreen()
+    } else {
+      Stack() {
+      Column() {
+        if (this.uiState.selectedTab === 5) {
+          this.DeviceManageContent()
+        } else if (this.uiState.selectedTab === 0 && this.uiState.playback.isPlaybackFullscreen) {
+          this.PlaybackFullscreenContent()
+        } else {
+          Column() {
+            this.MainTopBar()
+            Scroll() {
+              Column() {
+                if (this.uiState.selectedTab === 0) {
+                  CameraHomeScreen({
+                    cameras: this.vm?.filteredCameras ?? this.cameras,
+                    snapshots: this.snapshots,
+                    selectedCameraId: this.getSelectedCameraForGrid()?.id ?? '',
+                    playingCameraId: this.uiState.playback.playingCameraId ?? '',
+                    accentColor: this.colors.primary,
+                    bgColor: this.colors.background,
+                    surfaceColor: this.colors.surface,
+                    surfaceVariantColor: this.colors.surfaceVariant,
+                    onBackgroundColor: this.colors.onBackground,
+                    onSurfaceVariantColor: this.colors.onSurfaceVariant,
+                    onPrimaryColor: this.colors.onPrimary,
+                    secondaryContainerColor: this.colors.secondaryContainer,
+                    errorColor: this.colors.error,
+                    searchQuery: this.searchQuery,
+                    cameraFilter: this.cameraFilter,
+                    onCameraClick: (device: CameraDevice) => this.onCameraClick(device),
+                    onCameraLongPress: (device: CameraDevice) => this.onCameraLongPress(device),
+                    onAddCamera: () => this.onAddCamera(),
+                    onSearchChange: (q: string) => { this.vm?.setSearchQuery(q); this.syncState(); },
+                    onFilterChange: (f: string) => { this.vm?.setCameraFilter(f as 'all' | 'online' | 'offline'); this.syncState(); },
+                  })
+                } else if (this.uiState.selectedTab === 1) {
+                  BrowseScreen({
+                    accentColor: this.colors.primary,
+                    bgColor: this.colors.background,
+                    surfaceColor: this.colors.surface,
+                    surfaceVariantColor: this.colors.surfaceVariant,
+                    onSurfaceColor: this.colors.onSurface,
+                    onSurfaceVariantColor: this.colors.onSurfaceVariant,
+                    onPrimaryColor: this.colors.onPrimary,
+                    onPlayUrl: (title: string, url: string) => this.onPlayAdHocUrl(title, url),
+                  })
+                } else if (this.uiState.selectedTab === 2) {
+                  ActivityStreamScreen({
+                    recordings: this.recordings,
+                    bgColor: this.colors.background,
+                    surfaceColor: this.colors.surface,
+                    onSurfaceColor: this.colors.onSurface,
+                    onSurfaceVariantColor: this.colors.onSurfaceVariant,
+                    accentColor: this.colors.primary,
+                    onPrimaryColor: this.colors.onPrimary,
+                    surfaceVariantColor: this.colors.surfaceVariant,
+                    onOpenRecording: (file: RecordingFile) => this.onOpenRecording(file),
+                  })
+                } else if (this.uiState.selectedTab === 3) {
+                  SnapshotScreen({
+                    snapshots: this.snapshots,
+                    bgColor: this.colors.background,
+                    surfaceColor: this.colors.surface,
+                    onSurfaceColor: this.colors.onSurface,
+                    onSurfaceVariantColor: this.colors.onSurfaceVariant,
+                    accentColor: this.colors.primary,
+                    onOpenSnapshot: (file: RecordingFile) => this.onOpenRecording(file),
+                    onDeleteSnapshot: (file: RecordingFile) => this.onDeleteSnapshot(file),
+                    onShareSnapshot: (file: RecordingFile) => { this.vm?.shareSnapshot(file.filePath); },
+                  })
+                } else if (this.uiState.selectedTab === 4) {
+                  SettingsHomeScreen({
+                    storagePathInput: this.uiState.settings.storagePathInput,
+                    recordingQualityInput: this.uiState.settings.recordingQualityInput,
+                    recordingDurationInput: this.uiState.settings.recordingDurationInput,
+                    appearanceThemeMode: this.uiState.settings.appearanceThemeMode,
+                    rtmpUrlInput: this.uiState.settings.rtmpUrlInput,
+                    rtmpStreamKeyInput: this.uiState.settings.rtmpStreamKeyInput,
+                    rtmpUsernameInput: this.uiState.settings.rtmpUsernameInput,
+                    rtmpPasswordInput: this.uiState.settings.rtmpPasswordInput,
+                    rtmpAudioEnabled: this.uiState.settings.rtmpAudioEnabled,
+                    rtmpAutoStreamEnabled: this.uiState.settings.rtmpAutoStreamEnabled,
+                    bgColor: this.colors.background,
+                    surfaceColor: this.colors.surface,
+                    surfaceVariantColor: this.colors.surfaceVariant,
+                    onSurfaceColor: this.colors.onSurface,
+                    onSurfaceVariantColor: this.colors.onSurfaceVariant,
+                    accentColor: this.colors.primary,
+                    onPrimaryColor: this.colors.onPrimary,
+                    outlineVariantColor: this.colors.outlineVariant,
+                    onStoragePathChange: (v: string) => { this.vm?.onStoragePathChange(v); this.syncState(); },
+                    onRecordingQualityChange: (v: string) => { this.vm?.onRecordingQualityChange(v); this.syncState(); },
+                    onRecordingDurationChange: (v: string) => { this.vm?.onRecordingDurationChange(v); this.syncState(); },
+                    onThemeModeChange: (v: string) => { this.vm?.onAppearanceThemeModeChange(v); this.syncState(); },
+                    onRtmpUrlChange: (v: string) => { this.vm?.onRtmpUrlChange(v); this.syncState(); },
+                    onRtmpStreamKeyChange: (v: string) => { this.vm?.onRtmpStreamKeyChange(v); this.syncState(); },
+                    onRtmpUsernameChange: (v: string) => { this.vm?.onRtmpUsernameChange(v); this.syncState(); },
+                    onRtmpPasswordChange: (v: string) => { this.vm?.onRtmpPasswordChange(v); this.syncState(); },
+                    onRtmpAudioEnabledChange: (v: boolean) => { this.vm?.onRtmpAudioEnabledChange(v); this.syncState(); },
+                    onRtmpAutoStreamChange: (v: boolean) => { this.vm?.onRtmpAutoStreamChange(v); this.syncState(); },
+                    onClearRecordings: () => { this.vm?.clearRecordings(); this.syncState(); },
+                    onManageRtmpSettings: () => promptAction.showToast({ message: 'RTMP设置管理器功能开发中' }),
+                    appLockEnabled: this.uiState.appLockEnabled ?? false,
+                    onAppLockChange: (enabled: boolean) => {
+                      if (enabled) {
+                        this.vm?.setAppLock(true, '1234').then(() => this.syncState());
+                      } else {
+                        this.vm?.setAppLock(false).then(() => this.syncState());
+                      }
+                    },
+                  })
+                }
+              }
+              .width('100%')
+            }
+            .layoutWeight(1)
+            .scrollBar(BarState.Off)
+            .align(Alignment.Top)
+
+            NvrBottomBar({
+              selectedTab: this.uiState.selectedTab,
+              accentColor: this.colors.primary,
+              surfaceColor: this.colors.surface,
+              onSurfaceVariantColor: this.colors.onSurfaceVariant,
+              onPrimaryColor: this.colors.onPrimary,
+              onTabSelected: (index: number) => this.onTabSelected(index),
+            })
+          }
+        }
+      }
+      .width('100%')
+      .height('100%')
+
+      if (this.getCameraInAction() !== null && this.uiState.selectedTab !== 5) {
+        CameraActionOverlay({
+          camera: this.getCameraInAction()!,
+          badge: 'CAM',
+          accentColor: this.colors.primary,
+          surfaceColor: this.colors.surface,
+          onSurfaceColor: this.colors.onSurface,
+          outlineVariantColor: this.colors.outlineVariant,
+          onDismiss: () => { this.vm?.onLongPressedCameraIdChange(null); this.syncState(); },
+          onEdit: () => {
+            const cam = this.getCameraInAction();
+            this.vm?.onLongPressedCameraIdChange(null);
+            if (cam) { this.vm?.openEditForm(cam); }
+            this.syncState();
+          },
+          onCopy: () => {
+            const cam = this.getCameraInAction();
+            this.vm?.onLongPressedCameraIdChange(null);
+            if (cam) { this.vm?.duplicateCamera(cam).then(() => this.syncState()); }
+            this.syncState();
+          },
+          onDelete: () => {
+            const cam = this.getCameraInAction();
+            this.vm?.onLongPressedCameraIdChange(null);
+            if (cam) { this.vm?.deleteCamera(cam).then(() => this.syncState()); }
+            this.syncState();
+          },
+        })
+      }
+
+      if (this.uiState.currentRecordingDialog) {
+        Column() {
+          RecordingPreviewDialog({
+            dialogFile: this.uiState.currentRecordingDialog!,
+            accentColor: this.colors.primary,
+            onDismiss: () => { this.vm?.onCurrentRecordingDialogChange(null); this.syncState(); },
+          })
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .backgroundColor('#99000000')
+        .onClick(() => { this.vm?.onCurrentRecordingDialogChange(null); this.syncState(); })
+      }
+
+      if (this.uiState.pendingDeleteSnapshot) {
+        Column() {
+          DeleteSnapshotConfirmDialog({
+            fileName: this.uiState.pendingDeleteSnapshot!.fileName,
+            accentColor: this.colors.primary,
+            errorColor: this.colors.error,
+            onDismiss: () => { this.vm?.onPendingDeleteSnapshotChange(null); this.syncState(); },
+            onConfirmDelete: () => {
+              const file = this.uiState.pendingDeleteSnapshot;
+              if (file && this.vm) {
+                const deleted = this.vm.storageManager.deleteFile(file.filePath);
+                this.vm.onPendingDeleteSnapshotChange(null);
+                if (!deleted) { this.vm.reloadSnapshots().then(() => this.syncState()); }
+                promptAction.showToast({ message: deleted ? '快照已删除' : '删除失败' });
+              }
+              this.syncState();
+            },
+          })
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .backgroundColor('#99000000')
+        .onClick(() => { this.vm?.onPendingDeleteSnapshotChange(null); this.syncState(); })
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(this.colors.background)
+    }
+  }
+
+  @Builder
+  AppLockScreen() {
+    Column() {
+      Text('🔒')
+        .fontSize(48)
+        .margin({ bottom: 20 })
+
+      Text('请输入 PIN 码')
+        .fontSize(20)
+        .fontColor(this.colors.onBackground)
+        .fontWeight(FontWeight.Bold)
+        .margin({ bottom: 24 })
+
+      TextInput({ text: this.pinInput, placeholder: 'PIN' })
+        .fontSize(18)
+        .fontColor(this.colors.onBackground)
+        .backgroundColor(this.colors.surfaceVariant)
+        .borderRadius(12)
+        .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+        .width('60%')
+        .type(InputType.Password)
+        .onChange((v: string) => { this.pinInput = v; })
+
+      Text('解锁')
+        .fontSize(16)
+        .fontColor(this.colors.onPrimary)
+        .fontWeight(FontWeight.Bold)
+        .padding({ left: 32, right: 32, top: 14, bottom: 14 })
+        .backgroundColor(this.colors.primary)
+        .borderRadius(16)
+        .margin({ top: 20 })
+        .onClick(() => {
+          if (this.vm) {
+            this.vm.verifyPin(this.pinInput).then((ok: boolean) => {
+              if (ok) {
+                this.pinInput = '';
+                this.syncState();
+              } else {
+                promptAction.showToast({ message: 'PIN 码错误' });
+                this.pinInput = '';
+              }
+            });
+          }
+        })
+    }
+    .width('100%')
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .backgroundColor(this.colors.background)
+  }
+
+  @Builder
+  MainTopBar() {
+    NvrMainTopBar({
+      selectedTab: this.uiState.selectedTab,
+      accentColor: this.colors.primary,
+      bgColor: this.colors.background,
+      onBackgroundColor: this.colors.onBackground,
+      onPrimaryColor: this.colors.onPrimary,
+      onEditClick: () => {
+        this.vm?.reloadCameras().then(() => {
+          const cam = this.getSelectedCameraForGrid() ?? this.cameras[0] ?? null;
+          this.vm?.openEditForm(cam).then(() => this.syncState());
+        });
+      },
+      onMenuClick: () => {
+        this.vm?.reloadCameras().then(() => {
+          const cam = this.getSelectedCameraForGrid() ?? this.cameras[0] ?? null;
+          this.vm?.openEditForm(cam).then(() => this.syncState());
+        });
+      },
+      onAddClick: () => this.onAddCamera(),
+    })
+  }
+
+  @Builder
+  DeviceManageContent() {
+    Column() {
+      DeviceManageTopBar({
+        title: this.getDeviceManageTitle(),
+        flowStep: this.uiState.deviceForm.deviceFlowStep,
+        isEditingExistingCamera: this.uiState.deviceForm.deviceFlowStep === DeviceFlowStep.Form
+          && this.uiState.deviceForm.selectedDeviceId !== null,
+        accentColor: this.colors.primary,
+        bgColor: this.colors.background,
+        onSurfaceColor: this.colors.onSurface,
+        onSurfaceVariantColor: this.colors.onSurfaceVariant,
+        errorColor: this.colors.error,
+        onCancel: () => {
+          this.vm?.onSelectedTabChange(0);
+          this.vm?.onLongPressedCameraIdChange(null);
+          this.vm?.onVerificationResultChange(null);
+          this.vm?.onDeviceFlowStepChange(DeviceFlowStep.Landing);
+          this.syncState();
+        },
+        onBack: () => {
+          this.vm?.onDeviceFlowStepChange(
+            this.uiState.deviceForm.selectedDeviceId === null
+              ? DeviceFlowStep.Landing : DeviceFlowStep.Form
+          );
+          this.syncState();
+        },
+      })
+
+      if (this.uiState.deviceForm.deviceFlowStep === DeviceFlowStep.Landing) {
+        AddCameraLandingScreen({
+          bgColor: this.colors.background,
+          surfaceColor: this.colors.surface,
+          onSurfaceColor: this.colors.onSurface,
+          onSurfaceVariantColor: this.colors.onSurfaceVariant,
+          accentColor: this.colors.primary,
+          secondaryContainerColor: this.colors.secondaryContainer,
+          onAddLocalCamera: () => {
+            this.vm?.loadSelectedDeviceToForm(null).then(() => {
+              this.vm?.onDeviceFlowStepChange(DeviceFlowStep.Form);
+              this.syncState();
+            });
+          },
+        })
+      } else if (this.uiState.deviceForm.deviceFlowStep === DeviceFlowStep.Verifying) {
+        AddCameraVerificationScreen({
+          result: this.uiState.deviceForm.verificationResult,
+          forceHttpSoftwareDecode: this.uiState.deviceForm.forceHttpSoftwareDecode,
+          bgColor: this.colors.background,
+          surfaceColor: this.colors.surface,
+          onSurfaceColor: this.colors.onSurface,
+          onSurfaceVariantColor: this.colors.onSurfaceVariant,
+          accentColor: this.colors.primary,
+          onPrimaryColor: this.colors.onPrimary,
+          primaryColor: this.colors.primary,
+          onSave: () => {
+            this.vm?.saveVerifiedDevice().then(() => this.syncState());
+          },
+        })
+      } else {
+        AddCameraFormScreen({
+          manageName: this.uiState.deviceForm.manageName,
+          manageStreamScheme: this.uiState.deviceForm.manageStreamScheme,
+          manageHost: this.uiState.deviceForm.manageHost,
+          managePort: this.uiState.deviceForm.managePort,
+          manageStreamPath: this.uiState.deviceForm.manageStreamPath,
+          manageLoginEnabled: this.uiState.deviceForm.manageLoginEnabled,
+          manageUsername: this.uiState.deviceForm.manageUsername,
+          managePassword: this.uiState.deviceForm.managePassword,
+          managePasswordVisible: this.uiState.deviceForm.managePasswordVisible,
+          forceHttpSoftwareDecode: this.uiState.deviceForm.forceHttpSoftwareDecode,
+          bgColor: this.colors.background,
+          surfaceColor: this.colors.surface,
+          onSurfaceColor: this.colors.onSurface,
+          onSurfaceVariantColor: this.colors.onSurfaceVariant,
+          accentColor: this.colors.primary,
+          onPrimaryColor: this.colors.onPrimary,
+          outlineVariantColor: this.colors.outlineVariant,
+          onManageNameChange: (v: string) => { this.vm?.onManageNameChange(v); this.syncState(); },
+          onManageStreamSchemeChange: (v: string) => { this.vm?.onManageStreamSchemeChange(v); this.syncState(); },
+          onManageHostChange: (v: string) => { this.vm?.onManageHostChange(v); this.syncState(); },
+          onManagePortChange: (v: string) => { this.vm?.onManagePortChange(v); this.syncState(); },
+          onManageStreamPathChange: (v: string) => { this.vm?.onManageStreamPathChange(v); this.syncState(); },
+          onManageLoginEnabledChange: (v: boolean) => { this.vm?.onManageLoginEnabledChange(v); this.syncState(); },
+          onManageUsernameChange: (v: string) => { this.vm?.onManageUsernameChange(v); this.syncState(); },
+          onManagePasswordChange: (v: string) => { this.vm?.onManagePasswordChange(v); this.syncState(); },
+          onTogglePasswordVisible: () => { this.vm?.onManagePasswordVisibleChange(!this.uiState.deviceForm.managePasswordVisible); this.syncState(); },
+          onForceHttpSoftwareDecodeChange: (v: boolean) => { this.vm?.onForceHttpSoftwareDecodeChange(v); this.syncState(); },
+          onSave: () => { this.vm?.submitFormToVerification(); this.syncState(); },
+        })
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(this.colors.background)
+  }
+
+  @Builder
+  PlaybackFullscreenContent() {
+    PlaybackFullscreenScreen({
+      camera: this.getFullscreenCamera()!,
+      badge: 'CAM',
+      isPlaying: this.playbackControlPlaying,
+      isMuted: this.isMuted,
+      isVideoReady: this.isVideoReady,
+      isRecording: this.uiState.playback.isRecording,
+      accentColor: this.colors.primary,
+      onPrimaryColor: this.colors.onPrimary,
+      errorColor: this.colors.error,
+      surfaceVariantColor: this.colors.surfaceVariant,
+      surfaceId: this.surfaceId,
+      onBindSurface: (id: string) => {
+        this.surfaceId = id;
+        this.vm?.onVideoLayoutRefChange(id);
+        const cam = this.getFullscreenCamera();
+        if (cam) {
+          this.vm?.queuePlayback(cam);
+          this.syncState();
+        }
+      },
+      onBack: () => {
+        this.vm?.clearPlaybackState().then(() => {
+          this.vm?.onPlaybackFullscreenChange(false);
+          this.isVideoReady = false;
+          this.playbackControlPlaying = false;
+          const isAdHoc = this.uiState.playback.adHocPlaybackCamera != null;
+          const tabBefore = this.uiState.playback.tabBeforeFullscreen;
+          if (isAdHoc && tabBefore !== 0) {
+            this.vm?.onSelectedTabChange(tabBefore);
+          }
+          this.syncState();
+        });
+      },
+      onTogglePlayPause: () => {
+        if (this.playbackControlPlaying) {
+          this.playbackControlPlaying = false;
+          this.vm?.onCurrentPlayerPause();
+        } else {
+          this.playbackControlPlaying = true;
+          this.vm?.onCurrentPlayerPlay();
+        }
+      },
+      onMute: () => {
+        if (this.isMuted) {
+          this.isMuted = false;
+          this.vm?.onCurrentPlayerSetVolume(this.lastNonZeroVolume);
+          promptAction.showToast({ message: '已恢复声音' });
+        } else {
+          this.isMuted = true;
+          this.vm?.onCurrentPlayerSetVolume(0);
+          promptAction.showToast({ message: '已静音' });
+        }
+      },
+      onSnapshot: () => {
+        promptAction.showToast({ message: '快照功能需要视频画面就绪' });
+      },
+      onMore: () => promptAction.showToast({ message: '更多功能开发中' }),
+      onToggleRecord: () => { this.vm?.toggleRecording().then(() => this.syncState()); },
+      onSwipeLeft: () => this.switchCamera(1),
+      onSwipeRight: () => this.switchCamera(-1),
+      onPtzCommand: (cmd: string) => promptAction.showToast({ message: `PTZ: ${cmd}` }),
+    })
+  }
+
+  private getDeviceManageTitle(): string {
+    switch (this.uiState.deviceForm.deviceFlowStep) {
+      case DeviceFlowStep.Landing: return '添加相机';
+      case DeviceFlowStep.Verifying: return '正在验证';
+      case DeviceFlowStep.Form:
+        return this.uiState.deviceForm.selectedDeviceId === null
+          ? '新建照相机'
+          : (this.uiState.deviceForm.manageName || '设备设置');
+      default: return '';
+    }
+  }
+
+  private onTabSelected(index: number): void {
+    this.vm?.onSelectedTabChange(index);
+    this.vm?.onLongPressedCameraIdChange(null);
+    if (index === 2 || index === 3) {
+      this.vm?.reloadRecordings().then(() => {
+        this.vm?.reloadSnapshots().then(() => this.syncState());
+      });
+    }
+    if (index !== 0) {
+      this.vm?.clearPlaybackState().then(() => {
+        this.vm?.onPlaybackFullscreenChange(false);
+        this.syncState();
+      });
+    }
+    this.syncState();
+  }
+
+  private onAddCamera(): void {
+    this.vm?.openAddLanding();
+    this.syncState();
+  }
+
+  private async onCameraClick(device: CameraDevice): Promise<void> {
+    if (!this.vm) return;
+    const idx = this.cameras.findIndex(c => c.id === device.id);
+    this.vm.onSelectedCameraIndexChange(idx >= 0 ? idx : 0);
+    if (!this.isVlcAvailable) {
+      promptAction.showToast({ message: '播放器运行时不可用' });
+      return;
+    }
+    const cameraToPlay = await enrichCameraRtspUrl(device, this.vm.prefs);
+    this.vm.onPlaybackFullscreenChange(true);
+    this.vm.queuePlayback(cameraToPlay);
+    this.syncState();
+  }
+
+  private onCameraLongPress(device: CameraDevice): void {
+    if (!this.vm) return;
+    const idx = this.cameras.findIndex(c => c.id === device.id);
+    this.vm.onSelectedCameraIndexChange(idx >= 0 ? idx : 0);
+    this.vm.onLongPressedCameraIdChange(device.id);
+    this.syncState();
+  }
+
+  private onPlayAdHocUrl(title: string, url: string): void {
+    this.vm?.playAdHocUrl(title, url).then(() => this.syncState());
+  }
+
+  private onOpenRecording(file: RecordingFile): void {
+    this.vm?.onCurrentRecordingDialogChange(file);
+    this.syncState();
+  }
+
+  private onDeleteSnapshot(file: RecordingFile): void {
+    this.vm?.onPendingDeleteSnapshotChange(file);
+    this.syncState();
+  }
+
+  private async switchCamera(direction: number): Promise<void> {
+    if (!this.vm || this.cameras.length === 0) return;
+    const currentIdx = this.cameras.findIndex(c => c.id === this.uiState.playback.playingCameraId);
+    if (currentIdx < 0) return;
+    let nextIdx = currentIdx + direction;
+    if (nextIdx >= this.cameras.length) nextIdx = 0;
+    if (nextIdx < 0) nextIdx = this.cameras.length - 1;
+    const nextCamera = this.cameras[nextIdx];
+    if (!nextCamera || nextCamera.rtspUrl === '') return;
+    this.vm.onSelectedCameraIndexChange(nextIdx);
+    const cameraToPlay = await enrichCameraRtspUrl(nextCamera, this.vm.prefs);
+    this.vm.clearPlaybackState().then(() => {
+      this.vm?.queuePlayback(cameraToPlay);
+      this.isVideoReady = false;
+      this.playbackControlPlaying = false;
+      this.syncState();
+    });
+  }
+}

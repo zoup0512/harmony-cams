@@ -1,0 +1,4 @@
+<resources>
+    <style name="Theme" />
+    <style name="Theme.NVR" parent="@style/Theme" />
+</resources>

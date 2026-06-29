@@ -1,0 +1,102 @@
+<resources>
+    <string name="app_name">NVR Application</string>
+    <string name="hello_world">Hello World!</string>
+    <string name="start_recording">开始录制</string>
+    <string name="stop_recording">停止录制</string>
+    <string name="recording_in_progress">录制中...</string>
+    <string name="permissions_required">需要必要权限才能继续</string>
+
+    <string name="toast_rtmp_address_required">请先在设置页填写 RTMP 服务器地址</string>
+    <string name="toast_playback_failed">拉流失败：%1$s</string>
+    <string name="toast_playback_started">开始播放</string>
+    <string name="toast_playback_retrying_compat">正在切换兼容模式重试画面</string>
+    <string name="toast_playback_no_video">未出画面，诊断：%1$s</string>
+    <string name="toast_player_view_not_ready">播放器视图尚未就绪，请重试</string>
+
+    <string name="toast_snapshot_deleted">快照已删除</string>
+    <string name="toast_snapshot_delete_failed">删除失败</string>
+    <string name="toast_no_active_playback">当前没有可控制的播放</string>
+    <string name="toast_muted">已静音</string>
+    <string name="toast_unmuted">已恢复声音</string>
+    <string name="toast_no_snapshot_target">当前没有可截图的画面</string>
+    <string name="toast_snapshot_saved">快照已保存：%1$s</string>
+    <string name="toast_more_features_coming_soon">更多功能开发中</string>
+    <string name="toast_vlc_runtime_unavailable">VLC 运行时不可用，请确认宿主与插件依赖已同步</string>
+    <string name="toast_host_missing_network_permission">宿主缺少网络权限，请安装最新宿主包</string>
+
+    <string name="toast_theme_changed">主题已切换</string>
+    <string name="toast_accent_color_updated">重点颜色已更新</string>
+    <string name="toast_app_icon_switched">应用程序图标预设已切换</string>
+    <string name="toast_settings_saved">设置已保存</string>
+    <string name="toast_recordings_cleared">已清理 %1$d / %2$d 个文件</string>
+    <string name="toast_rtmp_manager_coming_soon">RTMP设置管理器功能开发中</string>
+    <string name="toast_camera_copied">已复制相机</string>
+    <string name="toast_camera_copy_failed">复制失败</string>
+    <string name="toast_camera_deleted">删除相机成功</string>
+    <string name="toast_camera_delete_failed">删除相机失败</string>
+
+    <string name="toast_save_success">保存成功</string>
+    <string name="toast_update_failed">更新失败</string>
+    <string name="toast_save_failed">保存失败</string>
+    <string name="toast_fill_host_ip">请填写主机/IP</string>
+    <string name="toast_port_format_invalid">端口格式不正确</string>
+
+    <string name="toast_playback_snapshot_failed_save">截图保存失败</string>
+    <string name="toast_playback_snapshot_blank_frame">截图失败，当前抓到的画面为空白帧</string>
+    <string name="toast_playback_snapshot_not_started">截图失败，请确认画面已开始播放</string>
+
+    <string name="toast_playback_validation_pass_generic">校验通过</string>
+    <string name="toast_playback_validation_host_empty">播放失败：%1$s 主机为空</string>
+    <string name="toast_playback_validation_login_required">播放失败：已启用登录但用户名为空，请在设备管理中保存用户名</string>
+    <string name="toast_playback_validation_auth_missing">播放失败：实际播放 URL 未包含鉴权信息，请先保存设备配置后重试</string>
+    <string name="toast_playback_validation_unsupported_scheme">播放失败：暂不支持该 URL 协议，请使用 RTSP、RTMP、HTTP 或 HTTP-FLV</string>
+    <string name="toast_playback_validation_pass_rtsp">RTSP 校验通过</string>
+    <string name="toast_playback_validation_pass_rtmp">RTMP 校验通过</string>
+    <string name="toast_playback_validation_pass_http">HTTP 校验通过</string>
+    <string name="toast_playback_validation_pass_https">HTTPS 校验通过</string>
+
+    <!-- Browse 页面 -->
+    <string name="browse_section_favorites">收藏</string>
+    <string name="browse_section_storage">存储设备</string>
+    <string name="browse_section_local_network">本地网络</string>
+    <string name="browse_section_discovered">已发现设备 (%1$d)</string>
+    <string name="browse_empty_favorites">暂无收藏</string>
+    <string name="browse_empty_local_videos">未找到视频文件</string>
+    <string name="browse_empty_network_sources">尚未添加网络源</string>
+    <string name="browse_subtitle_local_file">本地文件</string>
+    <string name="browse_subtitle_network_source">网络源</string>
+    <string name="browse_video_count">%1$d 个视频</string>
+    <string name="browse_scan_local_network">扫描局域网</string>
+    <string name="browse_more">更多</string>
+    <string name="browse_no_devices_found">未发现网络设备</string>
+    <string name="browse_devices_found">发现 %1$d 个设备</string>
+
+    <!-- NetworkSourceForm -->
+    <string name="network_form_add_title">添加网络源</string>
+    <string name="network_form_hint_name">名称（可选）</string>
+    <string name="network_form_hint_username">用户名(可选)</string>
+    <string name="network_form_hint_password">密码(可选)</string>
+    <string name="network_form_save">保存</string>
+    <string name="network_form_hint">提示：SMB/UPnP 自动发现尚未支持，请手动输入 URL。</string>
+
+    <!-- 设备管理 -->
+    <string name="device_add_local_camera">添加本地摄像机</string>
+    <string name="device_add_local_camera_subtitle">通过 IP 地址或域名添加本地网络摄像机</string>
+    <string name="device_add_manual_camera">手动添加</string>
+    <string name="device_add_manual_camera_subtitle">手动填写 RTSP/RTMP/HTTP 流地址</string>
+    <string name="device_manage_title_add">添加相机</string>
+    <string name="device_manage_title_verifying">正在验证</string>
+    <string name="device_manage_title_new">新建照相机</string>
+    <string name="device_manage_title_edit">设备设置</string>
+    <string name="device_duplicate_suffix">副本</string>
+
+    <!-- 对话框 -->
+    <string name="dialog_close">关闭</string>
+    <string name="dialog_delete">删除</string>
+    <string name="dialog_cancel">取消</string>
+    <string name="dialog_delete_snapshot_title">删除快照</string>
+
+    <!-- 临时播放 -->
+    <string name="ad_hoc_playback_name">临时播放</string>
+    <string name="unknown_camera_name">unknown</string>
+</resources>
