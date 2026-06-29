@@ -20,6 +20,14 @@ import {
 } from './NvrUiState';
 import { AppearanceThemeState } from '../theme/NvrTheme';
 
+function safeShowToast(message: string): void {
+  try {
+    promptAction.openToast({ message });
+  } catch (e) {
+    console.error(`showToast failed: ${(e as Error).message}`);
+  }
+}
+
 function generateUUID(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
@@ -269,28 +277,28 @@ export class NvrViewModel {
 
     if (!player) {
       const diagnosis = this.streamManager.getLastDiagnosticMessage();
-      promptAction.showToast({ message: `拉流失败：${diagnosis}` });
+      safeShowToast(`拉流失败：${diagnosis}`);
       return;
     }
 
     this.uiState.playback.playingCameraId = cameraToPlay.id;
     this.uiState.playback.lastRequestedPlaybackCameraId = cameraToPlay.id;
     this.streamManager.setVolume(this.uiState.playback.lastNonZeroVolume);
-    promptAction.showToast({ message: '开始播放' });
+    safeShowToast('开始播放');
   }
 
   /* Recording */
   async toggleRecording(): Promise<void> {
     if (!this.uiState.playback.playingCameraId) {
-      promptAction.showToast({ message: '当前没有可控制的播放' });
+      safeShowToast('当前没有可控制的播放');
       return;
     }
     if (this.uiState.playback.isRecording) {
       this.uiState.playback.isRecording = false;
-      promptAction.showToast({ message: '停止录制' });
+      safeShowToast('停止录制');
     } else {
       this.uiState.playback.isRecording = true;
-      promptAction.showToast({ message: '开始录制' });
+      safeShowToast('开始录制');
     }
   }
 
@@ -354,7 +362,7 @@ export class NvrViewModel {
       this.uiState.selectedCameraIndex = idx;
       }
     }
-    promptAction.showToast({ message: ok ? '已复制相机' : '复制失败' });
+    safeShowToast(ok ? '已复制相机' : '复制失败');
   }
 
   async deleteCamera(device: CameraDevice): Promise<void> {
@@ -369,7 +377,7 @@ export class NvrViewModel {
       await clearCameraPreferences(this.prefs, device.id);
       await this.reloadCameras();
     }
-    promptAction.showToast({ message: ok ? '删除相机成功' : '删除相机失败' });
+    safeShowToast(ok ? '删除相机成功' : '删除相机失败');
     const next = this.cameras.find(c => c.id !== device.id);
     await this.loadSelectedDeviceToForm(next ?? null);
   }
@@ -536,10 +544,8 @@ export class NvrViewModel {
       this.uiState.deviceForm.deviceFlowStep = DeviceFlowStep.Landing;
       this.uiState.deviceForm.verificationResult = null;
     }
-    promptAction.showToast({
-      message: success ? '保存成功'
-        : (editingDeviceId ? '更新失败' : '保存失败'),
-    });
+    safeShowToast(success ? '保存成功'
+      : (editingDeviceId ? '更新失败' : '保存失败'));
     return success;
   }
 
@@ -553,11 +559,11 @@ export class NvrViewModel {
     const selectedScheme = playbackStreamTypeFromScheme(d.manageStreamScheme) ?? PlaybackStreamType.RTSP;
 
     if (host === '') {
-      promptAction.showToast({ message: '请填写主机/IP' });
+      safeShowToast('请填写主机/IP');
       return;
     }
     if (port !== '' && !/^\d+$/.test(port)) {
-      promptAction.showToast({ message: '端口格式不正确' });
+      safeShowToast('端口格式不正确');
       return;
     }
 
@@ -587,7 +593,7 @@ export class NvrViewModel {
     for (const file of allFiles) {
       if (this.storageManager.deleteFile(file.filePath)) deleted++;
     }
-    promptAction.showToast({ message: `已清理 ${deleted} / ${allFiles.length} 个文件` });
+    safeShowToast(`已清理 ${deleted} / ${allFiles.length} 个文件`);
     await this.reloadRecordings();
   }
 
@@ -632,7 +638,7 @@ export class NvrViewModel {
       };
       context.startAbility(want);
     } catch (e) {
-      promptAction.showToast({ message: '分享失败' });
+      safeShowToast('分享失败');
     }
   }
 }

@@ -12,6 +12,14 @@ import { ActivityStreamScreen, SnapshotScreen, SettingsHomeScreen } from '../com
 import { RecordingPreviewDialog, DeleteSnapshotConfirmDialog } from '../components/NvrDialogComponents';
 import { NvrUiState, copyUiState } from '../viewmodel/NvrUiState';
 
+function safeShowToast(message: string): void {
+  try {
+    promptAction.openToast({ message });
+  } catch (e) {
+    console.error(`showToast failed: ${(e as Error).message}`);
+  }
+}
+
 @Entry
 @Component
 struct MainPage {
@@ -308,7 +316,7 @@ struct MainPage {
                     onRtmpAudioEnabledChange: (v: boolean) => { this.vm?.onRtmpAudioEnabledChange(v); this.syncState(); },
                     onRtmpAutoStreamChange: (v: boolean) => { this.vm?.onRtmpAutoStreamChange(v); this.syncState(); },
                     onClearRecordings: () => { this.vm?.clearRecordings(); this.syncState(); },
-                    onManageRtmpSettings: () => promptAction.showToast({ message: 'RTMP设置管理器功能开发中' }),
+                    onManageRtmpSettings: () => safeShowToast('RTMP设置管理器功能开发中'),
                     appLockEnabled: this.uiState.appLockEnabled ?? false,
                     onAppLockChange: (enabled: boolean) => {
                       if (enabled) {
@@ -399,7 +407,7 @@ struct MainPage {
                 const deleted = this.vm.storageManager.deleteFile(file.filePath);
                 this.vm.onPendingDeleteSnapshotChange(null);
                 if (!deleted) { this.vm.reloadSnapshots().then(() => this.syncState()); }
-                promptAction.showToast({ message: deleted ? '快照已删除' : '删除失败' });
+                safeShowToast(deleted ? '快照已删除' : '删除失败');
               }
               this.syncState();
             },
@@ -457,7 +465,7 @@ struct MainPage {
                 this.pinInput = '';
                 this.syncState();
               } else {
-                promptAction.showToast({ message: 'PIN 码错误' });
+                safeShowToast('PIN 码错误');
                 this.pinInput = '';
               }
             });
@@ -641,21 +649,21 @@ struct MainPage {
         if (this.isMuted) {
           this.isMuted = false;
           this.vm?.onCurrentPlayerSetVolume(this.lastNonZeroVolume);
-          promptAction.showToast({ message: '已恢复声音' });
+          safeShowToast('已恢复声音');
         } else {
           this.isMuted = true;
           this.vm?.onCurrentPlayerSetVolume(0);
-          promptAction.showToast({ message: '已静音' });
+          safeShowToast('已静音');
         }
       },
       onSnapshot: () => {
-        promptAction.showToast({ message: '快照功能需要视频画面就绪' });
+        safeShowToast('快照功能需要视频画面就绪');
       },
-      onMore: () => promptAction.showToast({ message: '更多功能开发中' }),
+      onMore: () => safeShowToast('更多功能开发中'),
       onToggleRecord: () => { this.vm?.toggleRecording().then(() => this.syncState()); },
       onSwipeLeft: () => this.switchCamera(1),
       onSwipeRight: () => this.switchCamera(-1),
-      onPtzCommand: (cmd: string) => promptAction.showToast({ message: `PTZ: ${cmd}` }),
+      onPtzCommand: (cmd: string) => safeShowToast(`PTZ: ${cmd}`),
     })
   }
 
@@ -698,7 +706,7 @@ struct MainPage {
     const idx = this.cameras.findIndex(c => c.id === device.id);
     this.vm.onSelectedCameraIndexChange(idx >= 0 ? idx : 0);
     if (!this.isVlcAvailable) {
-      promptAction.showToast({ message: '播放器运行时不可用' });
+      safeShowToast('播放器运行时不可用');
       return;
     }
     const cameraToPlay = await enrichCameraRtspUrl(device, this.vm.prefs);

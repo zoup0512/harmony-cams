@@ -18,7 +18,11 @@ export class StorageManager {
     try {
       fileIo.accessSync(dir);
     } catch {
-      fileIo.mkdirSync(dir, true);
+      try {
+        fileIo.mkdirSync(dir, true);
+      } catch (e) {
+        console.error(`StorageManager mkdir failed: ${(e as Error).message}`);
+      }
     }
     return dir;
   }
@@ -29,7 +33,11 @@ export class StorageManager {
     try {
       fileIo.accessSync(dir);
     } catch {
-      fileIo.mkdirSync(dir, true);
+      try {
+        fileIo.mkdirSync(dir, true);
+      } catch (e) {
+        console.error(`StorageManager mkdir failed: ${(e as Error).message}`);
+      }
     }
     return dir;
   }
