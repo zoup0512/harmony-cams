@@ -10,10 +10,10 @@ REM 仓库公开false / 私有true
 set PRIVATE_REPO=false
 REM =========================================================
 
-REM 运行时输入GitHub Token（不硬编码到文件中，避免泄露）
-set /p GITHUB_TOKEN=请输入GitHub Personal Access Token (ghp_...): 
+REM 从系统环境变量读取GitHub Token（不硬编码到文件中，避免泄露）
 if "%GITHUB_TOKEN%"=="" (
-    echo [x] 未输入Token，退出！
+    echo [x] 未检测到环境变量 GITHUB_TOKEN，请先设置！
+    echo     设置方法：set GITHUB_TOKEN=ghp_你的token
     pause
     exit /b 1
 )
