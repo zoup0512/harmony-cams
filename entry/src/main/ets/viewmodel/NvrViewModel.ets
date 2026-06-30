@@ -87,9 +87,10 @@ export class NvrViewModel {
 
   private async addDefaultCameraIfNeeded(): Promise<void> {
     try {
-      const count = await this.dbHelper.getCamerasCount();
-      if (count === 0) {
-        const defaultCamera = createCameraDevice(generateUUID(), '默认摄像头', '');
+      const cameras = await this.dbHelper.getAllCameras();
+      const exists = cameras.some(c => c.rtspUrl === 'rtmp://www.razor51.site:1935/live/1/livestream');
+      if (!exists) {
+        const defaultCamera = createCameraDevice(generateUUID(), '默认RTMP流', 'rtmp://www.razor51.site:1935/live/1/livestream');
         await this.dbHelper.addCamera(defaultCamera);
       }
     } catch (e) {
