@@ -5,13 +5,13 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "C:\\Users\\vyron\\.ohos\\config\\default_harmony-cams_SefVbimw-rKBEb9gE1pEzSSXJC1ZENj_Cv41m7cpCaU=.cer",
+          "certpath": "./sign/debug/debug.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001A17B9307A750C83B0946830E994D4A442755EA98440C156D3CC09EB48B1946831CC9C48370AA6",
-          "profile": "C:\\Users\\vyron\\.ohos\\config\\default_harmony-cams_SefVbimw-rKBEb9gE1pEzSSXJC1ZENj_Cv41m7cpCaU=.p7b",
+          "keyPassword": "0000001B00375F562757A4CA7B3FBC4E2F5CA2C025180D14EEE5E2F29CA4E01ADF0B4445F6D7A013826902",
+          "profile": "./sign/debug/debug.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\vyron\\.ohos\\config\\default_harmony-cams_SefVbimw-rKBEb9gE1pEzSSXJC1ZENj_Cv41m7cpCaU=.p12",
-          "storePassword": "0000001A2AB0271C41E77B6842423BE3CD1A4F9DDB4FC0D4DDA5C350F3956ACA3E3871461F342B7DDE86"
+          "storeFile": "./sign/debug/debug.p12",
+          "storePassword": "0000001B5A99BD948F8571EBF136A29FABB4EA49C417A74B5EA14CF1340299B529C9A3CCFA97B065321E4B"
         }
       }
     ],
