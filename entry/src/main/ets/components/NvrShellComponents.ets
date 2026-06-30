@@ -532,124 +532,130 @@ export struct PlaybackFullscreenScreen {
             direction: GradientDirection.Bottom,
             colors: [['#CC000000', 0.0], ['#00000000', 1.0]]
           })
-        }
-        .width('100%')
-        .align(Alignment.Top)
 
-        Row() {
-          Row({ space: 14 }) {
-            Text('📷')
-              .fontSize(22)
-              .fontColor('#FFFFFFB3')
-              .width(44)
-              .height(44)
-              .textAlign(TextAlign.Center)
-              .onClick(() => this.onSnapshot())
-
-            Text(this.isRecording ? '●' : '○')
-              .fontSize(22)
-              .fontColor(this.errorColor)
-              .width(44)
-              .height(44)
-              .textAlign(TextAlign.Center)
-              .onClick(() => this.onToggleRecord())
-
-            Text(this.isMuted ? '🔇' : '🔊')
-              .fontSize(22)
-              .fontColor('#FFFFFFB3')
-              .width(44)
-              .height(44)
-              .textAlign(TextAlign.Center)
-              .onClick(() => this.onMute())
-          }
-          .alignItems(VerticalAlign.Center)
-
-          Text('⋮')
-            .fontSize(22)
-            .fontColor('#FFFFFF')
-            .width(44)
-            .height(44)
-            .textAlign(TextAlign.Center)
-            .border({ width: 2, color: '#FFFFFF', radius: 22 })
-            .onClick(() => this.onMore())
-        }
-        .width('100%')
-        .justifyContent(FlexAlign.SpaceBetween)
-        .alignItems(VerticalAlign.Center)
-        .padding({ left: 20, right: 20, top: 14, bottom: 14 })
-        .linearGradient({
-          direction: GradientDirection.Top,
-          colors: [['#00000000', 0.0], ['#CC000000', 1.0]]
-        })
-        .align(Alignment.Bottom)
-
-        Stack() {
-          Circle({ width: 80, height: 80 })
-            .fill(this.accentColor)
-          Text(this.isPlaying ? '⏸' : '▶')
-            .fontSize(this.isPlaying ? 28 : 32)
-            .fontColor(this.onPrimaryColor)
-        }
-        .width(80)
-        .height(80)
-        .align(Alignment.Center)
-        .onClick(() => this.onTogglePlayPause())
-
-        // PTZ control pad
-        if (this.showPtzPad || this.showPtzControls) {
-          Row() {
-            // PTZ directional pad
-            Column() {
-              Text('▲')
-                .fontSize(24)
-                .fontColor('#FFFFFFCC')
-                .width(48)
-                .height(48)
-                .textAlign(TextAlign.Center)
-                .onClick(() => this.onPtzCommand('up'))
-
-              Row() {
-                Text('◀')
-                  .fontSize(24)
-                  .fontColor('#FFFFFFCC')
-                  .width(48)
-                  .height(48)
-                  .textAlign(TextAlign.Center)
-                  .onClick(() => this.onPtzCommand('left'))
-
-                Text('●')
-                  .fontSize(20)
-                  .fontColor('#FFFFFF80')
-                  .width(48)
-                  .height(48)
-                  .textAlign(TextAlign.Center)
-                  .onClick(() => this.onPtzCommand('home'))
-
-                Text('▶')
-                  .fontSize(24)
-                  .fontColor('#FFFFFFCC')
-                  .width(48)
-                  .height(48)
-                  .textAlign(TextAlign.Center)
-                  .onClick(() => this.onPtzCommand('right'))
-              }
-
-              Text('▼')
-                .fontSize(24)
-                .fontColor('#FFFFFFCC')
-                .width(48)
-                .height(48)
-                .textAlign(TextAlign.Center)
-                .onClick(() => this.onPtzCommand('down'))
+          Stack() {
+            Stack() {
+              Circle({ width: 80, height: 80 })
+                .fill(this.accentColor)
+              Text(this.isPlaying ? '⏸' : '▶')
+                .fontSize(this.isPlaying ? 28 : 32)
+                .fontColor(this.onPrimaryColor)
             }
-            .alignItems(HorizontalAlign.Center)
-            .backgroundColor('#33000000')
-            .borderRadius(16)
-            .padding(8)
+            .width(80)
+            .height(80)
+            .onClick(() => this.onTogglePlayPause())
+
+            // PTZ control pad
+            if (this.showPtzPad || this.showPtzControls) {
+              Column() {
+                Blank()
+                Row() {
+                  Column() {
+                    Text('▲')
+                      .fontSize(24)
+                      .fontColor('#FFFFFFCC')
+                      .width(48)
+                      .height(48)
+                      .textAlign(TextAlign.Center)
+                      .onClick(() => this.onPtzCommand('up'))
+
+                    Row() {
+                      Text('◀')
+                        .fontSize(24)
+                        .fontColor('#FFFFFFCC')
+                        .width(48)
+                        .height(48)
+                        .textAlign(TextAlign.Center)
+                        .onClick(() => this.onPtzCommand('left'))
+
+                      Text('●')
+                        .fontSize(20)
+                        .fontColor('#FFFFFF80')
+                        .width(48)
+                        .height(48)
+                        .textAlign(TextAlign.Center)
+                        .onClick(() => this.onPtzCommand('home'))
+
+                      Text('▶')
+                        .fontSize(24)
+                        .fontColor('#FFFFFFCC')
+                        .width(48)
+                        .height(48)
+                        .textAlign(TextAlign.Center)
+                        .onClick(() => this.onPtzCommand('right'))
+                    }
+
+                    Text('▼')
+                      .fontSize(24)
+                      .fontColor('#FFFFFFCC')
+                      .width(48)
+                      .height(48)
+                      .textAlign(TextAlign.Center)
+                      .onClick(() => this.onPtzCommand('down'))
+                  }
+                  .alignItems(HorizontalAlign.Center)
+                  .backgroundColor('#33000000')
+                  .borderRadius(16)
+                  .padding(8)
+                }
+                .padding({ left: 20, bottom: 10 })
+              }
+              .width('100%')
+              .height('100%')
+              .alignItems(HorizontalAlign.Start)
+            }
           }
-          .align(Alignment.BottomStart)
-          .padding({ left: 20, bottom: 80 })
+          .width('100%')
+          .layoutWeight(1)
+
+          Row() {
+            Row({ space: 14 }) {
+              Text('📷')
+                .fontSize(22)
+                .fontColor('#FFFFFFB3')
+                .width(44)
+                .height(44)
+                .textAlign(TextAlign.Center)
+                .onClick(() => this.onSnapshot())
+
+              Text(this.isRecording ? '●' : '○')
+                .fontSize(22)
+                .fontColor(this.errorColor)
+                .width(44)
+                .height(44)
+                .textAlign(TextAlign.Center)
+                .onClick(() => this.onToggleRecord())
+
+              Text(this.isMuted ? '🔇' : '🔊')
+                .fontSize(22)
+                .fontColor('#FFFFFFB3')
+                .width(44)
+                .height(44)
+                .textAlign(TextAlign.Center)
+                .onClick(() => this.onMute())
+            }
+            .alignItems(VerticalAlign.Center)
+
+            Text('⋮')
+              .fontSize(22)
+              .fontColor('#FFFFFF')
+              .width(44)
+              .height(44)
+              .textAlign(TextAlign.Center)
+              .border({ width: 2, color: '#FFFFFF', radius: 22 })
+              .onClick(() => this.onMore())
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
+          .alignItems(VerticalAlign.Center)
+          .padding({ left: 20, right: 20, top: 14, bottom: 14 })
+          .linearGradient({
+            direction: GradientDirection.Top,
+            colors: [['#00000000', 0.0], ['#CC000000', 1.0]]
+          })
         }
+        .width('100%')
+        .height('100%')
       }
     }
     .width('100%')
