@@ -9,6 +9,14 @@ import {
 import { BrowseFavorite, BrowseNetworkSource, BrowseSourceKind, DiscoveredDevice } from '../model/BrowseModels';
 import { NetworkDiscoveryService } from '../utils/NetworkDiscoveryService';
 
+function safeShowToast(message: string): void {
+  try {
+    promptAction.openToast({ message });
+  } catch (e) {
+    console.error(`showToast failed: ${(e as Error).message}`);
+  }
+}
+
 @Component
 export struct BrowseScreen {
   accentColor: string = '#20B486';
@@ -327,7 +335,7 @@ export struct BrowseScreen {
     this.urlInput = '';
     this.userInput = '';
     this.passwordInput = '';
-    promptAction.showToast({ message: '已添加网络源' });
+    safeShowToast('已添加网络源');
   }
 
   private async removeNetworkSource(id: string): Promise<void> {
@@ -349,13 +357,13 @@ export struct BrowseScreen {
       this.discoveredDevices = devices;
       this.isScanning = false;
       if (devices.length === 0) {
-        promptAction.showToast({ message: '未发现网络设备' });
+        safeShowToast('未发现网络设备');
       } else {
-        promptAction.showToast({ message: `发现 ${devices.length} 个设备` });
+        safeShowToast(`发现 ${devices.length} 个设备`);
       }
     }).catch(() => {
       this.isScanning = false;
-      promptAction.showToast({ message: '扫描失败' });
+      safeShowToast('扫描失败');
     });
   }
 

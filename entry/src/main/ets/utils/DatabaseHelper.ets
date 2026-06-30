@@ -19,10 +19,14 @@ export class DatabaseHelper {
       name: DATABASE_NAME,
       securityLevel: relationalStore.SecurityLevel.S1,
     };
-    this.rdbStore = await relationalStore.getRdbStore(this.context, config);
-    if (this.rdbStore.version === 0) {
-      await this.onCreate(this.rdbStore);
-      this.rdbStore.version = DATABASE_VERSION;
+    try {
+      this.rdbStore = await relationalStore.getRdbStore(this.context, config);
+      if (this.rdbStore.version === 0) {
+        await this.onCreate(this.rdbStore);
+        this.rdbStore.version = DATABASE_VERSION;
+      }
+    } catch (e) {
+      console.error(`DatabaseHelper init failed: ${(e as Error).message}`);
     }
   }
 
@@ -34,7 +38,11 @@ export class DatabaseHelper {
       camera_group TEXT DEFAULT '',
       sort_order INTEGER DEFAULT 0
     )`;
-    await db.executeSql(sql);
+    try {
+      await db.executeSql(sql);
+    } catch (e) {
+      console.error(`DatabaseHelper onCreate failed: ${(e as Error).message}`);
+    }
   }
 
   async addCamera(camera: CameraDevice): Promise<boolean> {

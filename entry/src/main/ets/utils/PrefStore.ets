@@ -15,41 +15,67 @@ export class PrefStore {
     const options: preferences.Options = {
       name: PREFS_NAME,
     };
-    this.prefs = await preferences.getPreferences(this.context, options);
+    try {
+      this.prefs = await preferences.getPreferences(this.context, options);
+    } catch (e) {
+      console.error(`PrefStore init failed: ${(e as Error).message}`);
+    }
   }
 
   async getString(key: string, defaultValue: string = ''): Promise<string> {
     if (!this.prefs) await this.init();
     if (!this.prefs) return defaultValue;
-    const val = await this.prefs.get(key, defaultValue);
-    return val as string;
+    try {
+      const val = await this.prefs.get(key, defaultValue);
+      return val as string;
+    } catch (e) {
+      console.error(`PrefStore getString failed: ${(e as Error).message}`);
+      return defaultValue;
+    }
   }
 
   async getBoolean(key: string, defaultValue: boolean = false): Promise<boolean> {
     if (!this.prefs) await this.init();
     if (!this.prefs) return defaultValue;
-    const val = await this.prefs.get(key, defaultValue);
-    return val as boolean;
+    try {
+      const val = await this.prefs.get(key, defaultValue);
+      return val as boolean;
+    } catch (e) {
+      console.error(`PrefStore getBoolean failed: ${(e as Error).message}`);
+      return defaultValue;
+    }
   }
 
   async putString(key: string, value: string): Promise<void> {
     if (!this.prefs) await this.init();
     if (!this.prefs) return;
-    await this.prefs.put(key, value);
-    await this.prefs.flush();
+    try {
+      await this.prefs.put(key, value);
+      await this.prefs.flush();
+    } catch (e) {
+      console.error(`PrefStore putString failed: ${(e as Error).message}`);
+    }
   }
 
   async putBoolean(key: string, value: boolean): Promise<void> {
     if (!this.prefs) await this.init();
     if (!this.prefs) return;
-    await this.prefs.put(key, value);
-    await this.prefs.flush();
+    try {
+      await this.prefs.put(key, value);
+      await this.prefs.flush();
+    } catch (e) {
+      console.error(`PrefStore putBoolean failed: ${(e as Error).message}`);
+    }
   }
 
   async remove(key: string): Promise<void> {
     if (!this.prefs) await this.init();
     if (!this.prefs) return;
-    await this.prefs.delete(key);
-    await this.prefs.flush();
+    try {
+      await this.prefs.delete(key);
+      await this.prefs.flush();
+    } catch (e) {
+      console.error(`PrefStore remove failed: ${(e as Error).message}`);
+    }
   }
 }

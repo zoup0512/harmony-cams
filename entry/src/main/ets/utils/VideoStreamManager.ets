@@ -147,13 +147,21 @@ export class VideoStreamManager {
 
   async play(): Promise<void> {
     if (this.currentPlayer) {
-      await this.currentPlayer.play();
+      try {
+        await this.currentPlayer.play();
+      } catch (e) {
+        console.error(`VideoStreamManager play failed: ${(e as Error).message}`);
+      }
     }
   }
 
   async pause(): Promise<void> {
     if (this.currentPlayer) {
-      await this.currentPlayer.pause();
+      try {
+        await this.currentPlayer.pause();
+      } catch (e) {
+        console.error(`VideoStreamManager pause failed: ${(e as Error).message}`);
+      }
     }
   }
 
