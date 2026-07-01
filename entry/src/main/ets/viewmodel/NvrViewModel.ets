@@ -1,4 +1,4 @@
-import { common, Want } from '@kit.AbilityKit';
+import { common, ConfigurationConstant, Want } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { CameraDevice, createCameraDevice } from '../model/CameraDevice';
 import { RecordingFile, createRecordingFile } from '../model/RecordingFile';
@@ -507,6 +507,18 @@ export class NvrViewModel {
     this.uiState.settings.appearanceThemeMode = v;
     await this.prefs.putString('appearance_theme_mode', v);
     AppearanceThemeState.update(v);
+    try {
+      const appContext = this.context.getApplicationContext();
+      if (v === 'system') {
+        appContext.setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
+      } else if (v === 'dark') {
+        appContext.setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_DARK);
+      } else {
+        appContext.setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT);
+      }
+    } catch (e) {
+      console.warn(`NvrViewModel onAppearanceThemeModeChange: setColorMode failed: ${(e as Error).message}`);
+    }
   }
 
   /* Dialogs */

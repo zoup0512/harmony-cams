@@ -1,4 +1,4 @@
-import { common } from '@kit.AbilityKit';
+import { common, ConfigurationConstant } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { CameraDevice } from '../model/CameraDevice';
 import { RecordingFile } from '../model/RecordingFile';
@@ -76,6 +76,7 @@ struct MainPage {
   @State snapshots: RecordingFile[] = [];
   @State recordings: RecordingFile[] = [];
   @State colors: NvrColors = getColors('light', 'light');
+  @StorageProp('currentColorMode') @Watch('onColorModeChange') currentColorMode: number = 1;
   @State isVlcAvailable: boolean = true;
   @State playbackControlPlaying: boolean = false;
   @State controlsVisible: boolean = true;
@@ -199,11 +200,16 @@ struct MainPage {
     this.cameras = [...this.vm.cameras];
     this.snapshots = [...this.vm.snapshots];
     this.recordings = [...this.vm.recordings];
-    this.colors = getColors(this.vm.uiState.settings.appearanceThemeMode,
-      this.vm.uiState.settings.appearanceThemeMode === 'dark' ? 'dark' : 'light');
+    const themeMode = this.vm.uiState.settings.appearanceThemeMode;
+    const systemColorMode: 'light' | 'dark' = this.currentColorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK ? 'dark' : 'light';
+    this.colors = getColors(themeMode, systemColorMode);
     this.searchQuery = this.vm.uiState.searchQuery ?? '';
     this.cameraFilter = this.vm.uiState.cameraFilter ?? 'all';
     this.isAppLocked = this.vm.uiState.isAppLocked ?? false;
+  }
+
+  onColorModeChange(): void {
+    this.syncState();
   }
 
   private getSelectedCameraForGrid(): CameraDevice | null {
@@ -318,7 +324,7 @@ struct MainPage {
                     onStoragePathChange: (v: string) => { this.vm?.onStoragePathChange(v); this.syncState(); },
                     onRecordingQualityChange: (v: string) => { this.vm?.onRecordingQualityChange(v); this.syncState(); },
                     onRecordingDurationChange: (v: string) => { this.vm?.onRecordingDurationChange(v); this.syncState(); },
-                    onThemeModeChange: (v: string) => { this.vm?.onAppearanceThemeModeChange(v); this.syncState(); },
+                    onThemeModeChange: (v: string) => { this.vm?.onAppearanceThemeModeChange(v).then(() => this.syncState()); },
                     onRtmpUrlChange: (v: string) => { this.vm?.onRtmpUrlChange(v); this.syncState(); },
                     onRtmpStreamKeyChange: (v: string) => { this.vm?.onRtmpStreamKeyChange(v); this.syncState(); },
                     onRtmpUsernameChange: (v: string) => { this.vm?.onRtmpUsernameChange(v); this.syncState(); },
