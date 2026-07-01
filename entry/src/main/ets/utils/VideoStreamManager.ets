@@ -1,4 +1,5 @@
 import { media } from '@kit.MediaKit';
+import { image } from '@kit.ImageKit';
 import { common } from '@kit.AbilityKit';
 import { CameraDevice } from '../model/CameraDevice';
 
@@ -277,6 +278,31 @@ export class VideoStreamManager {
       return this.currentPlayer.state === 'playing';
     }
     return false;
+  }
+
+  getSurfaceId(): string | null {
+    return this.surfaceId;
+  }
+
+  async captureSurfaceFrame(): Promise<image.PixelMap | null> {
+    const sid = this.surfaceId;
+    const hasPlayer = this.currentPlayer !== null;
+    const playerState = hasPlayer ? this.currentPlayer!.state : 'null';
+    console.info(`VideoStreamManager captureSurfaceFrame: BEGIN surfaceId='${sid}', hasPlayer=${hasPlayer}, playerState=${playerState}, hasVideoOutput=${this.hasVideoOutput}`);
+    if (!sid || !hasPlayer || !this.hasVideoOutput) {
+      console.warn(`VideoStreamManager captureSurfaceFrame: SKIPPED surfaceId='${sid}', hasPlayer=${hasPlayer}, hasVideoOutput=${this.hasVideoOutput}`);
+      return null;
+    }
+    try {
+      console.info(`VideoStreamManager captureSurfaceFrame: calling image.createPixelMapFromSurface('${sid}')...`);
+      const pixelMap = await image.createPixelMapFromSurface(sid);
+      const info = pixelMap.getImageInfoSync();
+      console.info(`VideoStreamManager captureSurfaceFrame: SUCCESS size=${info.size.width}x${info.size.height}`);
+      return pixelMap;
+    } catch (e) {
+      console.error(`VideoStreamManager captureSurfaceFrame FAILED: ${(e as Error).message}, stack=${(e as Error).stack}`);
+      return null;
+    }
   }
 
   async shutdown(): Promise<void> {

@@ -1,5 +1,7 @@
 import { common, ConfigurationConstant, Want } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
+import { image } from '@kit.ImageKit';
+import { fileIo } from '@kit.CoreFileKit';
 import { CameraDevice, createCameraDevice } from '../model/CameraDevice';
 import { RecordingFile, createRecordingFile } from '../model/RecordingFile';
 import { DatabaseHelper } from '../utils/DatabaseHelper';
@@ -12,7 +14,7 @@ import {
   playbackStreamTypeFromScheme, playbackStreamTypeFromUrl,
   buildDeviceManageFormValue, emptyDeviceManageFormValue,
   copyCameraPreferences, clearCameraPreferences,
-  enrichCameraRtspUrl, cameraBadge, DeviceManageFormValue,
+  enrichCameraRtspUrl, cameraBadge, DeviceManageFormValue, snapshotCameraKey,
 } from '../utils/PlaybackModels';
 import {
   NvrUiState, defaultUiState, NvrPlaybackState, NvrDeviceFormState,
@@ -108,6 +110,7 @@ export class NvrViewModel {
 
   async reloadCameras(): Promise<void> {
     this.cameras = await this.dbHelper.getAllCameras();
+    await this.loadCameraCoverImages();
     this.updateFilteredCameras();
     this.updateCameraGroups();
     if (this.uiState.selectedCameraIndex >= this.cameras.length) {
@@ -226,6 +229,86 @@ export class NvrViewModel {
     this.uiState.playback.pendingPlaybackRequestId = 0;
     this.uiState.playback.adHocPlaybackCamera = null;
     this.uiState.playback.isVideoReady = false;
+  }
+
+  async saveExitCoverImage(cameraId: string): Promise<void> {
+    console.info(`NvrViewModel saveExitCoverImage: BEGIN cameraId='${cameraId}'`);
+    if (!cameraId) {
+      console.warn(`NvrViewModel saveExitCoverImage: cameraId is empty, aborting`);
+      return;
+    }
+    const pixelMap = await this.streamManager.captureSurfaceFrame();
+    if (!pixelMap) {
+      console.warn(`NvrViewModel saveExitCoverImage: no frame captured for cameraId='${cameraId}'`);
+      return;
+    }
+    try {
+      const coversDir = this.context.cacheDir;
+      console.info(`NvrViewModel saveExitCoverImage: cacheDir='${this.context.cacheDir}', filesDir='${this.context.filesDir}'`);
+      try {
+        const list = fileIo.listFileSync(coversDir);
+        console.info(`NvrViewModel saveExitCoverImage: cacheDir listable, contents count=${list.length}`);
+      } catch (le) {
+        console.warn(`NvrViewModel saveExitCoverImage: listFileSync(cacheDir) failed: ${(le as Error).message}`);
+      }
+      const coverFileName = `${snapshotCameraKey(cameraId)}_cover.png`;
+      const coverFilePath = `${coversDir}/${coverFileName}`;
+      console.info(`NvrViewModel saveExitCoverImage: coverFilePath='${coverFilePath}'`);
+
+      const imagePacker = image.createImagePacker();
+      const packOpts: image.PackingOption = { format: 'image/png', quality: 90 };
+      console.info(`NvrViewModel saveExitCoverImage: opening file...`);
+      const file = await fileIo.open(coverFilePath, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE);
+      console.info(`NvrViewModel saveExitCoverImage: file opened, fd=${file.fd}`);
+      await imagePacker.packToFile(pixelMap, file.fd, packOpts);
+      console.info(`NvrViewModel saveExitCoverImage: packToFile succeeded`);
+      imagePacker.release();
+      pixelMap.release();
+      await fileIo.close(file);
+      console.info(`NvrViewModel saveExitCoverImage: file closed`);
+
+      await this.prefs.putString(`camera_cover_${cameraId}`, coverFilePath);
+      console.info(`NvrViewModel saveExitCoverImage: saved to prefs key='camera_cover_${cameraId}'`);
+      const camera = this.cameras.find(c => c.id === cameraId);
+      if (camera) {
+        camera.coverImagePath = coverFilePath;
+        console.info(`NvrViewModel saveExitCoverImage: set coverImagePath on camera '${camera.name}' in memory`);
+      } else {
+        console.warn(`NvrViewModel saveExitCoverImage: camera not found in this.cameras for id='${cameraId}'`);
+      }
+      console.info(`NvrViewModel saveExitCoverImage: DONE`);
+    } catch (e) {
+      console.error(`NvrViewModel saveExitCoverImage FAILED: ${(e as Error).message}, stack=${(e as Error).stack}`);
+      try { pixelMap.release(); } catch { /* ignore */ }
+    }
+  }
+
+  async loadCameraCoverImages(): Promise<void> {
+    console.info(`NvrViewModel loadCameraCoverImages: BEGIN, cameraCount=${this.cameras.length}`);
+    for (const camera of this.cameras) {
+      const prefKey = `camera_cover_${camera.id}`;
+      const path = await this.prefs.getString(prefKey, '');
+      if (path !== '') {
+        let fileExists = false;
+        try {
+          const stat = fileIo.statSync(path);
+          fileExists = stat.isFile();
+        } catch {
+          fileExists = false;
+        }
+        console.info(`NvrViewModel loadCameraCoverImages: cameraId='${camera.id}', name='${camera.name}', prefKey='${prefKey}', path='${path}', fileExists=${fileExists}`);
+        if (fileExists) {
+          camera.coverImagePath = path;
+        } else {
+          console.warn(`NvrViewModel loadCameraCoverImages: cover file does not exist, clearing path`);
+          camera.coverImagePath = undefined;
+        }
+      } else {
+        console.info(`NvrViewModel loadCameraCoverImages: cameraId='${camera.id}', name='${camera.name}', no cover path in prefs`);
+      }
+    }
+    const withCover = this.cameras.filter(c => c.coverImagePath).length;
+    console.info(`NvrViewModel loadCameraCoverImages: DONE, cameras with cover=${withCover}/${this.cameras.length}`);
   }
 
   queuePlayback(cameraToPlay: CameraDevice): void {
@@ -384,6 +467,11 @@ export class NvrViewModel {
     const ok = await this.dbHelper.deleteCamera(device.id);
     if (ok) {
       await clearCameraPreferences(this.prefs, device.id);
+      const coverPath = await this.prefs.getString(`camera_cover_${device.id}`, '');
+      if (coverPath !== '') {
+        try { this.storageManager.deleteFile(coverPath); } catch { /* ignore */ }
+        await this.prefs.remove(`camera_cover_${device.id}`);
+      }
       await this.reloadCameras();
     }
     safeShowToast(ok ? '删除相机成功' : '删除相机失败');

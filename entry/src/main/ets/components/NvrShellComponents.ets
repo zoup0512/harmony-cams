@@ -278,14 +278,22 @@ export struct CameraGridCard {
   build(): void {
     Column() {
       Stack() {
-        Column()
-          .width('100%')
-          .aspectRatio(1.55)
-          .borderRadius(14)
-          .linearGradient({
-            direction: GradientDirection.Right,
-            colors: [[this.surfaceVariantColor, 0.0], [this.isPlaying ? this.secondaryContainerColor : this.surfaceVariantColor, 1.0]]
-          })
+        if (this.camera.coverImagePath) {
+          Image(`file://${this.camera.coverImagePath}`)
+            .width('100%')
+            .height('100%')
+            .objectFit(ImageFit.Cover)
+            .borderRadius(14)
+        } else {
+          Column()
+            .width('100%')
+            .aspectRatio(1.55)
+            .borderRadius(14)
+            .linearGradient({
+              direction: GradientDirection.Right,
+              colors: [[this.surfaceVariantColor, 0.0], [this.isPlaying ? this.secondaryContainerColor : this.surfaceVariantColor, 1.0]]
+            })
+        }
 
         Row() {
           Circle({ width: 6, height: 6 })

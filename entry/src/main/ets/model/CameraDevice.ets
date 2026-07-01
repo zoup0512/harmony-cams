@@ -8,6 +8,7 @@ export interface CameraDevice {
   sortOrder?: number;
   lastSeen?: number;
   connectionQuality?: 'good' | 'fair' | 'poor' | 'unknown';
+  coverImagePath?: string;
 }
 
 export function createCameraDevice(

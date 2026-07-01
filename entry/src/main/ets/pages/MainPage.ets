@@ -117,9 +117,12 @@ struct MainPage {
   onPageHide(): void {
     if (this.vm && this.uiState.playback.playingCameraId) {
       this.restoreOrientation();
+      const cameraId = this.uiState.playback.playingCameraId;
       this.vm.prefs.getBoolean('allow_background_playback', false).then((allowed: boolean) => {
         if (!allowed) {
-          this.vm!.clearPlaybackState().then(() => this.syncState());
+          this.vm!.saveExitCoverImage(cameraId ?? '').then(() => {
+            this.vm!.clearPlaybackState().then(() => this.syncState());
+          });
         }
       });
     }
@@ -201,6 +204,13 @@ struct MainPage {
     if (!this.vm) return;
     this.uiState = copyUiState(this.vm.uiState);
     this.cameras = [...this.vm.cameras];
+    const coversCount = this.cameras.filter(c => c.coverImagePath).length;
+    console.info(`MainPage syncState: cameras=${this.cameras.length}, camerasWithCover=${coversCount}`);
+    for (const c of this.cameras) {
+      if (c.coverImagePath) {
+        console.info(`MainPage syncState: camera '${c.name}' (id='${c.id}') coverImagePath='${c.coverImagePath}'`);
+      }
+    }
     this.snapshots = [...this.vm.snapshots];
     this.recordings = [...this.vm.recordings];
     const themeMode = this.vm.uiState.settings.appearanceThemeMode;
@@ -643,19 +653,32 @@ struct MainPage {
         }
       },
       onBack: () => {
-        this.vm?.clearPlaybackState().then(() => {
-          this.vm?.onPlaybackFullscreenChange(false);
-          this.vm?.clearLastRequestedPlaybackCameraId();
-          this.isVideoReady = false;
-          this.playbackControlPlaying = false;
-          this.playbackInProgress = false;
-          this.restoreOrientation();
-          const isAdHoc = this.uiState.playback.adHocPlaybackCamera != null;
-          const tabBefore = this.uiState.playback.tabBeforeFullscreen;
-          if (isAdHoc && tabBefore !== 0) {
-            this.vm?.onSelectedTabChange(tabBefore);
-          }
-          this.syncState();
+        const cameraId = this.uiState.playback.playingCameraId;
+        const cam = this.getFullscreenCamera();
+        const cameraName = cam?.name ?? cameraId ?? '';
+        console.info(`MainPage onBack: BEGIN cameraId='${cameraId}', cameraName='${cameraName}', isVideoReady=${this.isVideoReady}, surfaceId='${this.surfaceId}'`);
+        this.vm?.saveExitCoverImage(cameraId ?? '').then(() => {
+          console.info(`MainPage onBack: saveExitCoverImage completed, now clearing playback...`);
+          this.vm?.clearPlaybackState().then(() => {
+            this.vm?.onPlaybackFullscreenChange(false);
+            this.vm?.clearLastRequestedPlaybackCameraId();
+            this.isVideoReady = false;
+            this.playbackControlPlaying = false;
+            this.playbackInProgress = false;
+            this.restoreOrientation();
+            const isAdHoc = this.uiState.playback.adHocPlaybackCamera != null;
+            const tabBefore = this.uiState.playback.tabBeforeFullscreen;
+            if (isAdHoc && tabBefore !== 0) {
+              this.vm?.onSelectedTabChange(tabBefore);
+            }
+            console.info(`MainPage onBack: reloading cameras and syncing state...`);
+            this.vm?.reloadCameras().then(() => {
+              const covers = this.vm?.cameras.filter(c => c.coverImagePath).length ?? 0;
+              console.info(`MainPage onBack: reloadCameras done, cameras with cover=${covers}/${this.vm?.cameras.length ?? 0}`);
+              this.syncState();
+            });
+            this.syncState();
+          });
         });
       },
       onTogglePlayPause: () => {
@@ -711,10 +734,20 @@ struct MainPage {
     }
     if (index !== 0) {
       this.restoreOrientation();
-      this.vm?.clearPlaybackState().then(() => {
-        this.vm?.onPlaybackFullscreenChange(false);
-        this.syncState();
-      });
+      const cameraId = this.uiState.playback.playingCameraId;
+      if (cameraId) {
+        this.vm?.saveExitCoverImage(cameraId).then(() => {
+          this.vm?.clearPlaybackState().then(() => {
+            this.vm?.onPlaybackFullscreenChange(false);
+            this.syncState();
+          });
+        });
+      } else {
+        this.vm?.clearPlaybackState().then(() => {
+          this.vm?.onPlaybackFullscreenChange(false);
+          this.syncState();
+        });
+      }
     }
     this.syncState();
   }
@@ -797,11 +830,14 @@ struct MainPage {
     if (!nextCamera || nextCamera.rtspUrl === '') return;
     this.vm.onSelectedCameraIndexChange(nextIdx);
     const cameraToPlay = await enrichCameraRtspUrl(nextCamera, this.vm.prefs);
-    this.vm.clearPlaybackState().then(() => {
-      this.vm?.queuePlayback(cameraToPlay);
-      this.isVideoReady = false;
-      this.playbackControlPlaying = false;
-      this.syncState();
+    const currentCameraId = this.uiState.playback.playingCameraId;
+    this.vm.saveExitCoverImage(currentCameraId ?? '').then(() => {
+      this.vm?.clearPlaybackState().then(() => {
+        this.vm?.queuePlayback(cameraToPlay);
+        this.isVideoReady = false;
+        this.playbackControlPlaying = false;
+        this.syncState();
+      });
     });
   }
 }
