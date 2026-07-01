@@ -96,9 +96,9 @@ export class NvrViewModel {
   private async addDefaultCameraIfNeeded(): Promise<void> {
     try {
       const cameras = await this.dbHelper.getAllCameras();
-      const exists = cameras.some(c => c.rtspUrl === 'rtmp://www.razor51.site:1935/live/1/livestream');
+      const exists = cameras.some(c => c.rtspUrl === 'http://www.razor51.site:2022/live/1/livestream.m3u8');
       if (!exists) {
-        const defaultCamera = createCameraDevice(generateUUID(), '默认RTMP流', 'rtmp://www.razor51.site:1935/live/1/livestream');
+        const defaultCamera = createCameraDevice(generateUUID(), '默认HLS流', 'http://www.razor51.site:2022/live/1/livestream.m3u8');
         await this.dbHelper.addCamera(defaultCamera);
       }
     } catch (e) {
@@ -242,6 +242,10 @@ export class NvrViewModel {
     this.uiState.playback.lastRequestedPlaybackCameraId = cameraId;
   }
 
+  clearLastRequestedPlaybackCameraId(): void {
+    this.uiState.playback.lastRequestedPlaybackCameraId = null;
+  }
+
   queuePendingPlaybackResume(cameraToResume: CameraDevice): void {
     this.uiState.playback.pendingPlaybackCamera = createCameraDevice(
       cameraToResume.id, cameraToResume.name, cameraToResume.rtspUrl,
@@ -270,18 +274,22 @@ export class NvrViewModel {
   }
 
   async startPlayback(cameraToPlay: CameraDevice): Promise<void> {
+    console.info(`NvrViewModel startPlayback: cameraId=${cameraToPlay.id}, name=${cameraToPlay.name}, url=${cameraToPlay.rtspUrl}`);
+    this.uiState.playback.pendingPlaybackCamera = null;
+    this.uiState.playback.pendingPlaybackRequestId = 0;
     await this.clearPlaybackState();
     cameraToPlay.isConnected = false;
 
     const player = await this.streamManager.startStream(cameraToPlay);
-    this.uiState.playback.pendingPlaybackCamera = null;
 
     if (!player) {
       const diagnosis = this.streamManager.getLastDiagnosticMessage();
+      console.error(`NvrViewModel startPlayback: startStream returned null, diagnosis=${diagnosis}, url=${cameraToPlay.rtspUrl}`);
       safeShowToast(`拉流失败：${diagnosis}`);
       return;
     }
 
+    console.info(`NvrViewModel startPlayback: success, playerState=${player.state}, url=${cameraToPlay.rtspUrl}`);
     this.uiState.playback.playingCameraId = cameraToPlay.id;
     this.uiState.playback.lastRequestedPlaybackCameraId = cameraToPlay.id;
     this.streamManager.setVolume(this.uiState.playback.lastNonZeroVolume);

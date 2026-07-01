@@ -83,6 +83,7 @@ struct MainPage {
   @State surfaceId: string = '';
   @State isMuted: boolean = false;
   @State lastNonZeroVolume: number = 100;
+  @State playbackInProgress: boolean = false;
   @State searchQuery: string = '';
   @State cameraFilter: string = 'all';
   @State isAppLocked: boolean = false;
@@ -164,9 +165,18 @@ struct MainPage {
     // Handle pending playback request
     const pendingCam = this.uiState.playback.pendingPlaybackCamera;
     const pendingReqId = this.uiState.playback.pendingPlaybackRequestId;
-    if (pendingCam && pendingReqId > 0 && this.surfaceId !== '' && this.uiState.selectedTab === 0) {
+    if (pendingCam && pendingReqId > 0) {
+      console.info(`MainPage pendingPlayback: camId=${pendingCam.id}, reqId=${pendingReqId}, surfaceId='${this.surfaceId}', selectedTab=${this.uiState.selectedTab}, url=${pendingCam.rtspUrl}`);
+    }
+    if (pendingCam && pendingReqId > 0 && this.surfaceId !== '' && this.uiState.selectedTab === 0 && !this.playbackInProgress) {
+      console.info(`MainPage: triggering startPlayback, surfaceId=${this.surfaceId}`);
+      this.playbackInProgress = true;
       this.vm.startPlayback(pendingCam).then(() => {
+        this.playbackInProgress = false;
+        this.playbackControlPlaying = this.vm?.streamManager.isPlaying() ?? false;
         this.syncState();
+      }).catch(() => {
+        this.playbackInProgress = false;
       });
     }
 
@@ -626,8 +636,10 @@ struct MainPage {
       onBack: () => {
         this.vm?.clearPlaybackState().then(() => {
           this.vm?.onPlaybackFullscreenChange(false);
+          this.vm?.clearLastRequestedPlaybackCameraId();
           this.isVideoReady = false;
           this.playbackControlPlaying = false;
+          this.playbackInProgress = false;
           const isAdHoc = this.uiState.playback.adHocPlaybackCamera != null;
           const tabBefore = this.uiState.playback.tabBeforeFullscreen;
           if (isAdHoc && tabBefore !== 0) {

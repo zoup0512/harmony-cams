@@ -388,10 +388,10 @@ export struct CameraGridCard {
 export struct PlaybackFullscreenScreen {
   camera: CameraDevice = { id: '', name: '', rtspUrl: '', isRecording: false, isConnected: false };
   badge: string = 'CAM';
-  isPlaying: boolean = false;
-  isMuted: boolean = false;
-  isVideoReady: boolean = false;
-  isRecording: boolean = false;
+  @Prop isPlaying: boolean = false;
+  @Prop isMuted: boolean = false;
+  @Prop isVideoReady: boolean = false;
+  @Prop isRecording: boolean = false;
   accentColor: string = '#20B486';
   onPrimaryColor: string = '#FFFFFF';
   errorColor: string = '#E53935';
@@ -437,7 +437,6 @@ export struct PlaybackFullscreenScreen {
         XComponent({
           id: 'nvrVideoSurface',
           type: XCOMPONENT_TYPE_SURFACE,
-          libraryname: 'avplayer',
           controller: this.xComponentController,
         })
           .onLoad(() => {
@@ -534,16 +533,18 @@ export struct PlaybackFullscreenScreen {
           })
 
           Stack() {
-            Stack() {
-              Circle({ width: 80, height: 80 })
-                .fill(this.accentColor)
-              Text(this.isPlaying ? '⏸' : '▶')
-                .fontSize(this.isPlaying ? 28 : 32)
-                .fontColor(this.onPrimaryColor)
+            if (!this.isPlaying) {
+              Stack() {
+                Circle({ width: 80, height: 80 })
+                  .fill(this.accentColor)
+                Text('▶')
+                  .fontSize(32)
+                  .fontColor(this.onPrimaryColor)
+              }
+              .width(80)
+              .height(80)
+              .onClick(() => this.onTogglePlayPause())
             }
-            .width(80)
-            .height(80)
-            .onClick(() => this.onTogglePlayPause())
 
             // PTZ control pad
             if (this.showPtzPad || this.showPtzControls) {
