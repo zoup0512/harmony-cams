@@ -1,5 +1,5 @@
 import { common, ConfigurationConstant } from '@kit.AbilityKit';
-import { promptAction } from '@kit.ArkUI';
+import { promptAction, window } from '@kit.ArkUI';
 import { CameraDevice } from '../model/CameraDevice';
 import { RecordingFile } from '../model/RecordingFile';
 import { NvrViewModel } from '../viewmodel/NvrViewModel';
@@ -92,9 +92,11 @@ struct MainPage {
   private pollTimerId: number = -1;
   private controlsTimerId: number = -1;
   private videoPollTimerId: number = -1;
+  private abilityContext: common.Context | null = null;
 
   aboutToAppear(): void {
     const context = this.getUIContext().getHostContext() as common.Context;
+    this.abilityContext = context;
     this.vm = new NvrViewModel(context);
     this.initVm();
   }
@@ -114,6 +116,7 @@ struct MainPage {
 
   onPageHide(): void {
     if (this.vm && this.uiState.playback.playingCameraId) {
+      this.restoreOrientation();
       this.vm.prefs.getBoolean('allow_background_playback', false).then((allowed: boolean) => {
         if (!allowed) {
           this.vm!.clearPlaybackState().then(() => this.syncState());
@@ -646,6 +649,7 @@ struct MainPage {
           this.isVideoReady = false;
           this.playbackControlPlaying = false;
           this.playbackInProgress = false;
+          this.restoreOrientation();
           const isAdHoc = this.uiState.playback.adHocPlaybackCamera != null;
           const tabBefore = this.uiState.playback.tabBeforeFullscreen;
           if (isAdHoc && tabBefore !== 0) {
@@ -706,6 +710,7 @@ struct MainPage {
       });
     }
     if (index !== 0) {
+      this.restoreOrientation();
       this.vm?.clearPlaybackState().then(() => {
         this.vm?.onPlaybackFullscreenChange(false);
         this.syncState();
@@ -730,6 +735,7 @@ struct MainPage {
     const cameraToPlay = await enrichCameraRtspUrl(device, this.vm.prefs);
     this.vm.onPlaybackFullscreenChange(true);
     this.vm.queuePlayback(cameraToPlay);
+    this.setLandscapeOrientation();
     this.syncState();
   }
 
@@ -742,7 +748,10 @@ struct MainPage {
   }
 
   private onPlayAdHocUrl(title: string, url: string): void {
-    this.vm?.playAdHocUrl(title, url).then(() => this.syncState());
+    this.vm?.playAdHocUrl(title, url).then(() => {
+      this.setLandscapeOrientation();
+      this.syncState();
+    });
   }
 
   private onOpenRecording(file: RecordingFile): void {
@@ -753,6 +762,28 @@ struct MainPage {
   private onDeleteSnapshot(file: RecordingFile): void {
     this.vm?.onPendingDeleteSnapshotChange(file);
     this.syncState();
+  }
+
+  private setLandscapeOrientation(): void {
+    if (!this.abilityContext) return;
+    try {
+      window.getLastWindow(this.abilityContext).then((win: window.Window) => {
+        win.setPreferredOrientation(window.Orientation.LANDSCAPE);
+      });
+    } catch (e) {
+      console.error(`setLandscapeOrientation failed: ${(e as Error).message}`);
+    }
+  }
+
+  private restoreOrientation(): void {
+    if (!this.abilityContext) return;
+    try {
+      window.getLastWindow(this.abilityContext).then((win: window.Window) => {
+        win.setPreferredOrientation(window.Orientation.AUTO_ROTATION);
+      });
+    } catch (e) {
+      console.error(`restoreOrientation failed: ${(e as Error).message}`);
+    }
   }
 
   private async switchCamera(direction: number): Promise<void> {
