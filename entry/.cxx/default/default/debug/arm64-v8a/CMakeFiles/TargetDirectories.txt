@@ -1,0 +1,3 @@
+D:/workspace/My/harmony/harmony-cams/harmony-cams/entry/.cxx/default/default/debug/arm64-v8a/CMakeFiles/rtspencoder.dir
+D:/workspace/My/harmony/harmony-cams/harmony-cams/entry/.cxx/default/default/debug/arm64-v8a/CMakeFiles/edit_cache.dir
+D:/workspace/My/harmony/harmony-cams/harmony-cams/entry/.cxx/default/default/debug/arm64-v8a/CMakeFiles/rebuild_cache.dir

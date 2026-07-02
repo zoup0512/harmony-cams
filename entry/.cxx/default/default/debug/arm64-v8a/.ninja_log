@@ -1,0 +1,8 @@
+# ninja log v6
+4	460	8046645562836331	CMakeFiles/rtspencoder.dir/napi_init.cpp.o	fb80cae6031e3112
+3	493	8046645284809626	CMakeFiles/rtspencoder.dir/video_encoder_engine.cpp.o	ca009268102270ec
+4	76	8046645686493970	D:/workspace/My/harmony/harmony-cams/harmony-cams/entry/build/default/intermediates/cmake/default/obj/arm64-v8a/librtspencoder.so	89d976e3b63929d6
+6	618	8046718631350370	CMakeFiles/rtspencoder.dir/video_encoder_engine.cpp.o	ca009268102270ec
+618	752	8046718637473598	D:/workspace/My/harmony/harmony-cams/harmony-cams/entry/build/default/intermediates/cmake/default/obj/arm64-v8a/librtspencoder.so	89d976e3b63929d6
+11	685	8046805402287895	CMakeFiles/rtspencoder.dir/video_encoder_engine.cpp.o	ca009268102270ec
+686	916	8046805409032978	D:/workspace/My/harmony/harmony-cams/harmony-cams/entry/build/default/intermediates/cmake/default/obj/arm64-v8a/librtspencoder.so	89d976e3b63929d6

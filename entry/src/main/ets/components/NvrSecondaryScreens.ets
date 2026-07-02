@@ -1,4 +1,7 @@
 import { RecordingFile, readableFileSize } from '../model/RecordingFile';
+import { buildPhoneRtspAddress } from '../utils/NetworkUtils';
+import { CameraStreamManager, StreamStatus } from '../utils/CameraStreamManager';
+import { common } from '@kit.AbilityKit';
 
 interface ThemeOptionItem {
   value: string;
@@ -20,6 +23,29 @@ export struct ActivityStreamScreen {
   @State isStreaming: boolean = false;
   @State useFrontCamera: boolean = false;
   @State statusText: string = '未启动';
+  @State rtspAddress: string = buildPhoneRtspAddress();
+  @State clientCount: number = 0;
+  private streamManager: CameraStreamManager | null = null;
+  private xComponentController: XComponentController = new XComponentController();
+  private previewSurfaceId: string = '';
+
+  aboutToAppear(): void {
+    this.rtspAddress = buildPhoneRtspAddress();
+    const context = getContext(this) as common.Context;
+    this.streamManager = new CameraStreamManager(context);
+    this.streamManager.setStatusCallback((status: StreamStatus) => {
+      this.isStreaming = status.isStreaming;
+      this.statusText = status.statusText;
+      this.clientCount = status.clientCount;
+    });
+  }
+
+  aboutToDisappear(): void {
+    if (this.streamManager) {
+      this.streamManager.release();
+      this.streamManager = null;
+    }
+  }
 
   build(): void {
     Column() {
@@ -75,24 +101,43 @@ export struct ActivityStreamScreen {
             .justifyContent(FlexAlign.SpaceBetween)
 
             Stack() {
-              Column()
+              XComponent({
+                id: 'rtspCameraPreview',
+                type: XComponentType.SURFACE,
+                controller: this.xComponentController
+              })
+                .onLoad(() => {
+                  this.previewSurfaceId = this.xComponentController.getXComponentSurfaceId();
+                  console.info(`ActivityStreamScreen XComponent.onLoad: surfaceId=${this.previewSurfaceId}, hasStreamManager=${this.streamManager !== null}`);
+                  if (this.streamManager && this.previewSurfaceId) {
+                    this.streamManager.initPreview(this.previewSurfaceId).then(() => {
+                      console.info(`ActivityStreamScreen XComponent.onLoad: initPreview completed`);
+                    }).catch((e: Error) => {
+                      console.error(`ActivityStreamScreen XComponent.onLoad: initPreview failed: ${e.message}`);
+                    });
+                  } else {
+                    console.error(`ActivityStreamScreen XComponent.onLoad: streamManager=${this.streamManager !== null}, surfaceId='${this.previewSurfaceId}'`);
+                  }
+                })
                 .width('100%')
                 .height('100%')
-                .justifyContent(FlexAlign.Center)
-                .alignItems(HorizontalAlign.Center)
-              Text(this.isStreaming ? '🔴 推流中' : '📷 预览区')
-                .fontSize(16)
-                .fontColor('#FFFFFF80')
+
+              if (!this.isStreaming && this.statusText === '未启动') {
+                Text('📷 预览区')
+                  .fontSize(16)
+                  .fontColor('#FFFFFF80')
+              }
             }
             .width('100%')
             .aspectRatio(4 / 3)
             .borderRadius(16)
             .backgroundColor('#000000')
             .margin({ top: 12 })
+            .clip(true)
 
             Text(this.selectedStreamTool === 'rtmp'
               ? '目标地址：请在设置中配置 RTMP 服务器'
-              : '推流地址：rtsp://127.0.0.1:8554/live')
+              : `推流地址：${this.rtspAddress}`)
               .fontSize(12)
               .fontColor(this.onSurfaceVariantColor)
               .margin({ top: 12 })
@@ -101,18 +146,19 @@ export struct ActivityStreamScreen {
               Button(this.useFrontCamera ? '切到后置' : '切到前置')
                 .layoutWeight(1)
                 .onClick(() => {
-                  this.useFrontCamera = !this.useFrontCamera;
-                  this.statusText = this.useFrontCamera ? '已切到前置摄像头' : '已切到后置摄像头';
+                  if (this.streamManager) {
+                    this.streamManager.switchCamera().then(() => {
+                      this.useFrontCamera = !this.useFrontCamera;
+                    });
+                  }
                 })
               Button(this.isStreaming ? '停止推流' : '开始推流')
                 .layoutWeight(1)
                 .onClick(() => {
                   if (this.isStreaming) {
-                    this.isStreaming = false;
-                    this.statusText = '已停止';
+                    this.streamManager?.stopStream();
                   } else {
-                    this.isStreaming = true;
-                    this.statusText = '推流中';
+                    this.streamManager?.startStream();
                   }
                 })
             }
