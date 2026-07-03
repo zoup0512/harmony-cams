@@ -72,7 +72,7 @@ export class StorageManager {
     const result: RecordingFile[] = [];
     const dir = this.getSnapshotDirectoryPath(rootPath);
     this.walkSnapshots(dir, result);
-    result.sort((a, b) => b.fileSize - a.fileSize);
+    result.sort((a, b) => (b.startTime ?? 0) - (a.startTime ?? 0));
     return result;
   }
 
@@ -96,7 +96,7 @@ export class StorageManager {
                 fileName,
                 filePath,
                 stat.size,
-                null,
+                stat.mtime * 1000,
                 null,
                 '',
                 cameraName,

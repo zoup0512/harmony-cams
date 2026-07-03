@@ -94,6 +94,7 @@ struct MainPage {
   private controlsTimerId: number = -1;
   private videoPollTimerId: number = -1;
   private abilityContext: common.Context | null = null;
+  private isPageHidden: boolean = false;
 
   aboutToAppear(): void {
     const context = this.getUIContext().getHostContext() as common.Context;
@@ -112,17 +113,20 @@ struct MainPage {
   }
 
   onPageShow(): void {
-    // page becomes visible
+    this.isPageHidden = false;
   }
 
   onPageHide(): void {
+    this.isPageHidden = true;
     if (this.vm && this.uiState.playback.playingCameraId) {
       this.restoreOrientation();
       const cameraId = this.uiState.playback.playingCameraId;
       this.vm.prefs.getBoolean('allow_background_playback', false).then((allowed: boolean) => {
-        if (!allowed) {
+        if (!allowed && this.isPageHidden) {
           this.vm!.saveExitCoverImage(cameraId ?? '').then(() => {
-            this.vm!.clearPlaybackState().then(() => this.syncState());
+            if (this.isPageHidden) {
+              this.vm!.clearPlaybackState().then(() => this.syncState());
+            }
           });
         }
       });
@@ -708,7 +712,14 @@ struct MainPage {
         }
       },
       onSnapshot: () => {
-        safeShowToast('快照功能需要视频画面就绪');
+        const cameraId = this.uiState.playback.playingCameraId;
+        const cam = this.getFullscreenCamera();
+        const cameraName = cam?.name ?? cameraId ?? '';
+        if (!cameraId) {
+          safeShowToast('无法截取快照：缺少相机信息');
+          return;
+        }
+        this.vm?.saveSnapshot(cameraId, cameraName).then(() => this.syncState());
       },
       onMore: () => safeShowToast('更多功能开发中'),
       onToggleRecord: () => { this.vm?.toggleRecording().then(() => this.syncState()); },

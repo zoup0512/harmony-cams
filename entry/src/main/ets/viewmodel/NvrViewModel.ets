@@ -391,6 +391,48 @@ export class NvrViewModel {
     safeShowToast('开始播放');
   }
 
+  async saveSnapshot(cameraId: string, cameraName: string): Promise<boolean> {
+    console.info(`NvrViewModel saveSnapshot: BEGIN cameraId='${cameraId}', name='${cameraName}'`);
+    if (!cameraId) {
+      safeShowToast('无法截取快照：缺少相机信息');
+      return false;
+    }
+    const pixelMap = await this.streamManager.captureSurfaceFrame();
+    if (!pixelMap) {
+      safeShowToast('快照功能需要视频画面就绪');
+      return false;
+    }
+    try {
+      const rootPath = this.uiState.settings.storagePathInput.trim() || this.context.filesDir;
+      const snapshotDir = this.storageManager.getSnapshotDirectoryPath(rootPath);
+      const now = new Date();
+      const dateFolder = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const timestamp = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+      const safeName = snapshotCameraKey(cameraName);
+      const fullDir = `${snapshotDir}/${dateFolder}`;
+      try { fileIo.mkdirSync(fullDir, true); } catch { /* may already exist */ }
+      const snapshotPath = `${fullDir}/${safeName}_${timestamp}.png`;
+      console.info(`NvrViewModel saveSnapshot: saving to '${snapshotPath}'`);
+
+      const imagePacker = image.createImagePacker();
+      const packOpts: image.PackingOption = { format: 'image/png', quality: 90 };
+      const file = await fileIo.open(snapshotPath, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE);
+      await imagePacker.packToFile(pixelMap, file.fd, packOpts);
+      imagePacker.release();
+      pixelMap.release();
+      await fileIo.close(file);
+      console.info(`NvrViewModel saveSnapshot: DONE, path='${snapshotPath}'`);
+      safeShowToast('快照已保存');
+      await this.reloadSnapshots();
+      return true;
+    } catch (e) {
+      console.error(`NvrViewModel saveSnapshot FAILED: ${(e as Error).message}, stack=${(e as Error).stack}`);
+      try { pixelMap.release(); } catch { /* ignore */ }
+      safeShowToast('快照保存失败');
+      return false;
+    }
+  }
+
   /* Recording */
   async toggleRecording(): Promise<void> {
     if (!this.uiState.playback.playingCameraId) {

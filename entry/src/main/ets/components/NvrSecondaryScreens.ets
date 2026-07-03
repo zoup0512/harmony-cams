@@ -8,6 +8,37 @@ interface ThemeOptionItem {
   label: string;
 }
 
+interface SnapshotGroup {
+  label: string;
+  items: RecordingFile[];
+}
+
+function formatDateGroupLabel(timestamp: number): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
+  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  if (dateStart.getTime() === todayStart.getTime()) return '今天';
+  if (dateStart.getTime() === yesterdayStart.getTime()) return '昨天';
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+function groupSnapshotsByDate(snapshots: RecordingFile[]): SnapshotGroup[] {
+  const groups: SnapshotGroup[] = [];
+  for (const s of snapshots) {
+    const ts = s.startTime ?? 0;
+    const label = ts > 0 ? formatDateGroupLabel(ts) : '未知日期';
+    let group = groups.find(g => g.label === label);
+    if (!group) {
+      group = { label, items: [] };
+      groups.push(group);
+    }
+    group.items.push(s);
+  }
+  return groups;
+}
+
 @Component
 export struct ActivityStreamScreen {
   recordings: RecordingFile[] = [];
@@ -266,73 +297,65 @@ export struct SnapshotScreen {
   onShareSnapshot: (file: RecordingFile) => void = () => {};
 
   build(): void {
-    if (this.snapshots.length === 0) {
+    Scroll() {
       Column() {
-        Text('暂无快照')
-          .fontSize(16)
-          .fontColor(this.onSurfaceVariantColor)
-      }
-      .width('100%')
-      .height('100%')
-      .justifyContent(FlexAlign.Center)
-      .alignItems(HorizontalAlign.Center)
-      .backgroundColor(this.bgColor)
-    } else {
-      Column() {
-          ForEach(this.snapshots, (snapshot: RecordingFile) => {
-            Column() {
-              Image(snapshot.filePath)
+        if (this.snapshots.length === 0) {
+          Text('暂无快照')
+            .fontSize(16)
+            .fontColor(this.onSurfaceVariantColor)
+        } else {
+        ForEach(groupSnapshotsByDate(this.snapshots), (group: SnapshotGroup) => {
+          Text(group.label)
+            .fontSize(16)
+            .fontColor(this.onSurfaceColor)
+            .fontWeight(FontWeight.Bold)
+            .width('100%')
+            .margin({ top: 16, bottom: 8 })
+
+          ForEach(group.items, (snapshot: RecordingFile) => {
+            Stack({ alignContent: Alignment.BottomEnd }) {
+              Image(`file://${snapshot.filePath}`)
                 .width('100%')
-                .aspectRatio(1.15)
-                .borderRadius(12)
+                .aspectRatio(16 / 9)
+                .borderRadius(14)
                 .objectFit(ImageFit.Cover)
                 .backgroundColor(this.surfaceColor)
-
-              Text(snapshot.fileName)
-                .fontSize(14)
-                .fontColor(this.onSurfaceColor)
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .margin({ top: 10 })
-
-              Text(readableFileSize(snapshot.fileSize))
-                .fontSize(12)
-                .fontColor(this.onSurfaceVariantColor)
-                .margin({ top: 4 })
+                .onError((err) => {
+                  console.error(`SnapshotScreen Image onError: filePath='${snapshot.filePath}'`);
+                })
+                .onComplete(() => {
+                  console.info(`SnapshotScreen Image onComplete: filePath='${snapshot.filePath}'`);
+                })
 
               Row() {
-                Text('查看')
-                  .fontSize(12)
-                  .fontColor(this.accentColor)
-                  .fontWeight(FontWeight.Medium)
-                  .layoutWeight(1)
                 Text('📤')
-                  .fontSize(16)
-                  .margin({ right: 8 })
+                  .fontSize(18)
+                  .margin({ right: 12 })
                   .onClick(() => this.onShareSnapshot(snapshot))
                 Text('🗑')
-                  .fontSize(16)
+                  .fontSize(18)
                   .onClick(() => this.onDeleteSnapshot(snapshot))
               }
-              .width('100%')
-              .margin({ top: 8 })
+              .padding({ right: 12, bottom: 10 })
             }
-            .layoutWeight(1)
-            .borderRadius(18)
-            .backgroundColor(this.surfaceColor)
-            .padding(12)
-            .margin({ bottom: 16 })
+            .width('100%')
+            .borderRadius(14)
+            .margin({ bottom: 12 })
             .onClick(() => this.onOpenSnapshot(snapshot))
             .gesture(
               LongPressGesture()
                 .onAction(() => this.onDeleteSnapshot(snapshot))
             )
-          })
+          }, (snapshot: RecordingFile) => snapshot.filePath)
+        }, (group: SnapshotGroup) => group.label)
         }
-        .width('100%')
-        .padding({ left: 16, top: 12, right: 16, bottom: 100 })
-        .backgroundColor(this.bgColor)
+      }
+      .width('100%')
+      .padding({ left: 16, top: 12, right: 16, bottom: 100 })
     }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(this.bgColor)
   }
 }
 
