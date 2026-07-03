@@ -8,6 +8,7 @@ import { DatabaseHelper } from '../utils/DatabaseHelper';
 import { StorageManager } from '../utils/StorageManager';
 import { VideoStreamManager } from '../utils/VideoStreamManager';
 import { PrefStore } from '../utils/PrefStore';
+import { loadStreamConfig } from '../utils/StreamConfig';
 import {
   DeviceFlowStep, VerificationPreview, PlaybackStreamType,
   buildPlaybackUrl, defaultPlaybackPort, parsePlaybackUrl, sanitizePlaybackUrl,
@@ -65,6 +66,8 @@ export class NvrViewModel {
     await this.dbHelper.init();
     await this.prefs.init();
 
+    const streamConfig = await loadStreamConfig(this.context);
+
     const savedStoragePath = await this.prefs.getString('storage_path', '');
     const initialStorage = savedStoragePath && savedStoragePath.trim() !== '' && savedStoragePath !== '/sdcard/NVR'
       ? savedStoragePath
@@ -74,10 +77,10 @@ export class NvrViewModel {
         storagePathInput: initialStorage,
         recordingQualityInput: await this.prefs.getString('recording_quality', '1080p'),
         recordingDurationInput: await this.prefs.getString('recording_duration', '30'),
-        rtmpUrlInput: await this.prefs.getString('rtmp_push_url', ''),
-        rtmpStreamKeyInput: await this.prefs.getString('rtmp_push_stream_key', ''),
-        rtmpUsernameInput: await this.prefs.getString('rtmp_push_username', ''),
-        rtmpPasswordInput: await this.prefs.getString('rtmp_push_password', ''),
+        rtmpUrlInput: await this.prefs.getString('rtmp_push_url', streamConfig.rtmp.url),
+        rtmpStreamKeyInput: await this.prefs.getString('rtmp_push_stream_key', streamConfig.rtmp.streamKey),
+        rtmpUsernameInput: await this.prefs.getString('rtmp_push_username', streamConfig.rtmp.username),
+        rtmpPasswordInput: await this.prefs.getString('rtmp_push_password', streamConfig.rtmp.password),
         rtmpAudioEnabled: await this.prefs.getBoolean('rtmp_push_audio_enabled', true),
         rtmpAutoStreamEnabled: await this.prefs.getBoolean('rtmp_auto_stream', false),
         appearanceThemeMode: await this.prefs.getString('appearance_theme_mode', 'light'),
@@ -97,10 +100,13 @@ export class NvrViewModel {
 
   private async addDefaultCameraIfNeeded(): Promise<void> {
     try {
+      const streamConfig = await loadStreamConfig(this.context);
+      const hlsUrl = streamConfig.hls.url;
+      const hlsName = streamConfig.hls.name;
       const cameras = await this.dbHelper.getAllCameras();
-      const exists = cameras.some(c => c.rtspUrl === 'http://www.razor51.site:2022/live/1/livestream.m3u8');
+      const exists = cameras.some(c => c.rtspUrl === hlsUrl);
       if (!exists) {
-        const defaultCamera = createCameraDevice(generateUUID(), '默认HLS流', 'http://www.razor51.site:2022/live/1/livestream.m3u8');
+        const defaultCamera = createCameraDevice(generateUUID(), hlsName, hlsUrl);
         await this.dbHelper.addCamera(defaultCamera);
       }
     } catch (e) {

@@ -300,6 +300,10 @@ struct MainPage {
                     accentColor: this.colors.primary,
                     onPrimaryColor: this.colors.onPrimary,
                     surfaceVariantColor: this.colors.surfaceVariant,
+                    rtmpUrlInput: this.uiState.settings.rtmpUrlInput,
+                    rtmpStreamKeyInput: this.uiState.settings.rtmpStreamKeyInput,
+                    rtmpUsernameInput: this.uiState.settings.rtmpUsernameInput,
+                    rtmpPasswordInput: this.uiState.settings.rtmpPasswordInput,
                     onOpenRecording: (file: RecordingFile) => this.onOpenRecording(file),
                   })
                 } else if (this.uiState.selectedTab === 3) {
@@ -345,7 +349,7 @@ struct MainPage {
                     onRtmpAudioEnabledChange: (v: boolean) => { this.vm?.onRtmpAudioEnabledChange(v); this.syncState(); },
                     onRtmpAutoStreamChange: (v: boolean) => { this.vm?.onRtmpAutoStreamChange(v); this.syncState(); },
                     onClearRecordings: () => { this.vm?.clearRecordings(); this.syncState(); },
-                    onManageRtmpSettings: () => safeShowToast('RTMP设置管理器功能开发中'),
+                    onManageRtmpSettings: () => safeShowToast('请在推流页面配置 RTMP 服务器地址'),
                     appLockEnabled: this.uiState.appLockEnabled ?? false,
                     onAppLockChange: (enabled: boolean) => {
                       if (enabled) {

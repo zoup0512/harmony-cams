@@ -2,6 +2,7 @@ import { camera } from '@kit.CameraKit';
 import { common, abilityAccessCtrl, Permissions } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { RtspServer } from './RtspServer';
+import { RtmpPushManager, RtmpPushConfig, parseRtmpUrl, RtmpPushStatus } from './RtmpPushManager';
 import { PHONE_RTSP_PORT } from './NetworkUtils';
 import { createEncoder, startEncoder, stopEncoder, releaseEncoder, EncodedFrame } from 'librtspencoder.so';
 
@@ -17,6 +18,10 @@ export interface StreamStatus {
 export class CameraStreamManager {
   private context: common.Context;
   private rtspServer: RtspServer;
+  private rtmpPushManager: RtmpPushManager | null = null;
+  private streamMode: 'rtsp' | 'rtmp' = 'rtsp';
+  private rtmpConfig: RtmpPushConfig | null = null;
+  private rtmpStatusText: string = '';
   private cameraManager: camera.CameraManager | null = null;
   private cameraInput: camera.CameraInput | null = null;
   private previewOutput: camera.PreviewOutput | null = null;
@@ -46,19 +51,45 @@ export class CameraStreamManager {
     this.statusCallback = cb;
   }
 
+  setStreamMode(mode: 'rtsp' | 'rtmp'): void {
+    if (this.streaming) return;
+    this.streamMode = mode;
+    console.info(`${TAG} stream mode set to ${mode}`);
+  }
+
+  setRtmpConfig(url: string, streamKey: string, username: string, password: string): void {
+    const parsed = parseRtmpUrl(url);
+    this.rtmpConfig = {
+      host: parsed.host,
+      port: parsed.port,
+      app: parsed.app,
+      streamKey: streamKey,
+      username: username,
+      password: password,
+    };
+    console.info(`${TAG} RTMP config: host=${parsed.host}, port=${parsed.port}, app=${parsed.app}, key=${streamKey}`);
+  }
+
   private notifyStatus(): void {
     if (this.statusCallback) {
+      const clientCount = this.streamMode === 'rtsp' ? this.rtspServer.getClientCount() : 0;
       this.statusCallback({
         isStreaming: this.streaming,
         isPreviewReady: this.previewReady,
         statusText: this.getStatusText(),
-        clientCount: this.rtspServer.getClientCount(),
+        clientCount: clientCount,
       });
     }
   }
 
   private getStatusText(): string {
     if (this.streaming) {
+      if (this.streamMode === 'rtmp') {
+        if (this.rtmpPushManager && this.rtmpPushManager.isPublishing()) {
+          return 'RTMP 推流中';
+        }
+        return this.rtmpStatusText || 'RTMP 连接中...';
+      }
       const count = this.rtspServer.getClientCount();
       if (count > 0) {
         return `推流中 · ${count}个客户端连接`;
@@ -200,9 +231,39 @@ export class CameraStreamManager {
         return;
       }
 
-      console.info(`${TAG} startStream: starting RTSP server...`);
-      await this.rtspServer.start();
-      console.info(`${TAG} startStream: RTSP server started`);
+      if (this.streamMode === 'rtmp') {
+        console.info(`${TAG} startStream: RTMP mode, connecting to server...`);
+        if (!this.rtmpConfig) {
+          console.error(`${TAG} startStream: RTMP config not set`);
+          this.statusCallback?.({
+            isStreaming: false,
+            isPreviewReady: this.previewReady,
+            statusText: '请先配置 RTMP 服务器',
+            clientCount: 0,
+          });
+          return;
+        }
+        this.rtmpPushManager = new RtmpPushManager();
+        this.rtmpPushManager.setOnStatusChange((status: RtmpPushStatus, message?: string) => {
+          if (message) this.rtmpStatusText = message;
+          else this.rtmpStatusText = '';
+          this.notifyStatus();
+        });
+        try {
+          await this.rtmpPushManager.connect(this.rtmpConfig);
+          console.info(`${TAG} startStream: RTMP connect initiated`);
+        } catch (connectErr) {
+          console.error(`${TAG} startStream: RTMP connect failed: ${(connectErr as Error).message}`);
+          this.streaming = false;
+          this.rtmpPushManager = null;
+          this.notifyStatus();
+          return;
+        }
+      } else {
+        console.info(`${TAG} startStream: starting RTSP server...`);
+        await this.rtspServer.start();
+        console.info(`${TAG} startStream: RTSP server started`);
+      }
 
       if (this.cameraManager && this.session) {
         console.info(`${TAG} startStream: creating VideoOutput...`);
@@ -219,7 +280,11 @@ export class CameraStreamManager {
         console.info(`${TAG} startStream: VideoOutput created`);
 
         console.info(`${TAG} startStream: stopping session before reconfig...`);
-        await this.session.stop();
+        try {
+          await this.session.stop();
+        } catch (stopErr) {
+          console.warn(`${TAG} startStream: session.stop() failed (may already be stopped): ${(stopErr as Error).message}`);
+        }
         console.info(`${TAG} startStream: session stopped, beginConfig...`);
         this.session.beginConfig();
         this.session.addOutput(this.videoOutput);
@@ -272,7 +337,12 @@ export class CameraStreamManager {
       }
 
       releaseEncoder();
-      await this.rtspServer.stop();
+      if (this.streamMode === 'rtmp' && this.rtmpPushManager) {
+        await this.rtmpPushManager.disconnect();
+        this.rtmpPushManager = null;
+      } else {
+        await this.rtspServer.stop();
+      }
 
       this.notifyStatus();
       console.info(`${TAG} Stream stopped`);
@@ -360,11 +430,17 @@ export class CameraStreamManager {
         const nalu = data.subarray(offset, end);
         const naluType = nalu.length > 0 ? nalu[0] & 0x1F : 0;
         console.info(`${TAG} NALU(Annex-B): type=${naluType}, len=${nalu.length}, isKeyFrame=${isKeyFrame}`);
-        this.rtspServer.sendH264Data(nalu, pts);
+        if (this.streamMode === 'rtmp' && this.rtmpPushManager) {
+          this.rtmpPushManager.sendH264Data(nalu, pts);
+        } else {
+          this.rtspServer.sendH264Data(nalu, pts);
+        }
         if (naluType === 7) {
           this.rtspServer.setSps(nalu);
+          if (this.rtmpPushManager) this.rtmpPushManager.setSps(nalu);
         } else if (naluType === 8) {
           this.rtspServer.setPps(nalu);
+          if (this.rtmpPushManager) this.rtmpPushManager.setPps(nalu);
         }
       }
       offset = end;
@@ -384,11 +460,17 @@ export class CameraStreamManager {
       const nalu = data.subarray(offset, offset + naluLength);
       const naluType = nalu.length > 0 ? nalu[0] & 0x1F : 0;
       console.info(`${TAG} NALU(AVCC): type=${naluType}, len=${naluLength}, isKeyFrame=${isKeyFrame}`);
-      this.rtspServer.sendH264Data(nalu, pts);
+      if (this.streamMode === 'rtmp' && this.rtmpPushManager) {
+        this.rtmpPushManager.sendH264Data(nalu, pts);
+      } else {
+        this.rtspServer.sendH264Data(nalu, pts);
+      }
       if (naluType === 7) {
         this.rtspServer.setSps(nalu);
+        if (this.rtmpPushManager) this.rtmpPushManager.setSps(nalu);
       } else if (naluType === 8) {
         this.rtspServer.setPps(nalu);
+        if (this.rtmpPushManager) this.rtmpPushManager.setPps(nalu);
       }
 
       offset += naluLength;

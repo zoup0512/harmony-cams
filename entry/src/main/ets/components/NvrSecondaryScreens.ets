@@ -19,6 +19,10 @@ export struct ActivityStreamScreen {
   onPrimaryColor: string = '#FFFFFF';
   surfaceVariantColor: string = '#F0F1F5';
   onOpenRecording: (file: RecordingFile) => void = () => {};
+  rtmpUrlInput: string = '';
+  rtmpStreamKeyInput: string = '';
+  rtmpUsernameInput: string = '';
+  rtmpPasswordInput: string = '';
   @State selectedStreamTool: string = 'rtsp';
   @State isStreaming: boolean = false;
   @State useFrontCamera: boolean = false;
@@ -59,7 +63,12 @@ export struct ActivityStreamScreen {
               .padding({ top: 10, bottom: 10 })
               .backgroundColor(this.selectedStreamTool === 'rtsp' ? this.accentColor : this.surfaceVariantColor)
               .borderRadius(12)
-              .onClick(() => { this.selectedStreamTool = 'rtsp'; })
+              .onClick(() => {
+                this.selectedStreamTool = 'rtsp';
+                if (this.streamManager) {
+                  this.streamManager.setStreamMode('rtsp');
+                }
+              })
 
             Text('RTMP 推流')
               .fontSize(14)
@@ -70,7 +79,18 @@ export struct ActivityStreamScreen {
               .padding({ top: 10, bottom: 10 })
               .backgroundColor(this.selectedStreamTool === 'rtmp' ? this.accentColor : this.surfaceVariantColor)
               .borderRadius(12)
-              .onClick(() => { this.selectedStreamTool = 'rtmp'; })
+              .onClick(() => {
+                this.selectedStreamTool = 'rtmp';
+                if (this.streamManager) {
+                  this.streamManager.setStreamMode('rtmp');
+                  this.streamManager.setRtmpConfig(
+                    this.rtmpUrlInput,
+                    this.rtmpStreamKeyInput,
+                    this.rtmpUsernameInput,
+                    this.rtmpPasswordInput,
+                  );
+                }
+              })
           }
           .width('100%')
 
@@ -136,7 +156,7 @@ export struct ActivityStreamScreen {
             .clip(true)
 
             Text(this.selectedStreamTool === 'rtmp'
-              ? '目标地址：请在设置中配置 RTMP 服务器'
+              ? (this.rtmpUrlInput ? `目标：rtmp://${this.rtmpUrlInput.replace(/^rtmp:\/\//i, '')}/${this.rtmpStreamKeyInput}` : '目标地址：请在设置中配置 RTMP 服务器')
               : `推流地址：${this.rtspAddress}`)
               .fontSize(12)
               .fontColor(this.onSurfaceVariantColor)
@@ -158,6 +178,15 @@ export struct ActivityStreamScreen {
                   if (this.isStreaming) {
                     this.streamManager?.stopStream();
                   } else {
+                    if (this.selectedStreamTool === 'rtmp' && this.streamManager) {
+                      this.streamManager.setStreamMode('rtmp');
+                      this.streamManager.setRtmpConfig(
+                        this.rtmpUrlInput,
+                        this.rtmpStreamKeyInput,
+                        this.rtmpUsernameInput,
+                        this.rtmpPasswordInput,
+                      );
+                    }
                     this.streamManager?.startStream();
                   }
                 })
