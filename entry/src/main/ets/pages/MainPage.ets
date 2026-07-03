@@ -73,6 +73,7 @@ struct MainPage {
     },
   };
   @State cameras: CameraDevice[] = [];
+  @State filteredCameras: CameraDevice[] = [];
   @State snapshots: RecordingFile[] = [];
   @State recordings: RecordingFile[] = [];
   @State colors: NvrColors = getColors('light', 'light');
@@ -204,6 +205,7 @@ struct MainPage {
     if (!this.vm) return;
     this.uiState = copyUiState(this.vm.uiState);
     this.cameras = [...this.vm.cameras];
+    this.filteredCameras = [...this.vm.filteredCameras];
     const coversCount = this.cameras.filter(c => c.coverImagePath).length;
     console.info(`MainPage syncState: cameras=${this.cameras.length}, camerasWithCover=${coversCount}`);
     for (const c of this.cameras) {
@@ -258,7 +260,7 @@ struct MainPage {
               Column() {
                 if (this.uiState.selectedTab === 0) {
                   CameraHomeScreen({
-                    cameras: this.vm?.filteredCameras ?? this.cameras,
+                    cameras: this.filteredCameras,
                     snapshots: this.snapshots,
                     selectedCameraId: this.getSelectedCameraForGrid()?.id ?? '',
                     playingCameraId: this.uiState.playback.playingCameraId ?? '',

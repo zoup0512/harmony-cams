@@ -85,7 +85,7 @@ export struct NvrMainTopBar {
 
 @Component
 export struct CameraHomeScreen {
-  cameras: CameraDevice[] = [];
+  @Prop cameras: CameraDevice[] = [];
   snapshots: RecordingFile[] = [];
   selectedCameraId: string = '';
   playingCameraId: string = '';

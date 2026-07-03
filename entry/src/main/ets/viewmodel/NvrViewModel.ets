@@ -104,10 +104,14 @@ export class NvrViewModel {
       const hlsUrl = streamConfig.hls.url;
       const hlsName = streamConfig.hls.name;
       const cameras = await this.dbHelper.getAllCameras();
+      console.info(`addDefaultCameraIfNeeded: existing cameras=${cameras.length}, hlsUrl=${hlsUrl}`);
       const exists = cameras.some(c => c.rtspUrl === hlsUrl);
       if (!exists) {
         const defaultCamera = createCameraDevice(generateUUID(), hlsName, hlsUrl);
-        await this.dbHelper.addCamera(defaultCamera);
+        const added = await this.dbHelper.addCamera(defaultCamera);
+        console.info(`addDefaultCameraIfNeeded: added default camera '${hlsName}' -> ${added}`);
+      } else {
+        console.info(`addDefaultCameraIfNeeded: default camera already exists`);
       }
     } catch (e) {
       console.error(`addDefaultCameraIfNeeded failed: ${(e as Error).message}`);
@@ -116,8 +120,10 @@ export class NvrViewModel {
 
   async reloadCameras(): Promise<void> {
     this.cameras = await this.dbHelper.getAllCameras();
+    console.info(`reloadCameras: loaded ${this.cameras.length} cameras from DB`);
     await this.loadCameraCoverImages();
     this.updateFilteredCameras();
+    console.info(`reloadCameras: filteredCameras=${this.filteredCameras.length}`);
     this.updateCameraGroups();
     if (this.uiState.selectedCameraIndex >= this.cameras.length) {
       this.uiState.selectedCameraIndex = 0;
