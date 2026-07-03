@@ -1,4 +1,4 @@
-# Install script for directory: D:/workspace/My/harmony/harmony-cams/harmony-cams/entry/src/main/cpp
+# Install script for directory: C:/Users/24790/DevEcoStudioProjects/github/publish/harmony-cams/entry/src/main/cpp
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -50,5 +50,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "D:/workspace/My/harmony/harmony-cams/harmony-cams/entry/.cxx/default/default/debug/arm64-v8a/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "C:/Users/24790/DevEcoStudioProjects/github/publish/harmony-cams/entry/.cxx/default/default/debug/arm64-v8a/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

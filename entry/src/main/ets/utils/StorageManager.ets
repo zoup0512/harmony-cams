@@ -116,7 +116,8 @@ export class StorageManager {
     try {
       fileIo.unlinkSync(filePath);
       return true;
-    } catch {
+    } catch (e) {
+      console.error(`StorageManager deleteFile failed: filePath='${filePath}', error=${(e as Error).message}`);
       return false;
     }
   }

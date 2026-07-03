@@ -455,7 +455,7 @@ struct MainPage {
               if (file && this.vm) {
                 const deleted = this.vm.storageManager.deleteFile(file.filePath);
                 this.vm.onPendingDeleteSnapshotChange(null);
-                if (!deleted) { this.vm.reloadSnapshots().then(() => this.syncState()); }
+                this.vm.reloadSnapshots().then(() => this.syncState());
                 safeShowToast(deleted ? '快照已删除' : '删除失败');
               }
               this.syncState();

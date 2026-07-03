@@ -286,7 +286,7 @@ export struct ActivityStreamScreen {
 
 @Component
 export struct SnapshotScreen {
-  snapshots: RecordingFile[] = [];
+  @Prop snapshots: RecordingFile[] = [];
   bgColor: string = '#F7F8FA';
   surfaceColor: string = '#FFFFFF';
   onSurfaceColor: string = '#1B1B1D';
@@ -347,7 +347,7 @@ export struct SnapshotScreen {
                 .onAction(() => this.onDeleteSnapshot(snapshot))
             )
           }, (snapshot: RecordingFile) => snapshot.filePath)
-        }, (group: SnapshotGroup) => group.label)
+        }, (group: SnapshotGroup) => `${group.label}_${group.items.map(i => i.filePath).join(',')}`)
         }
       }
       .width('100%')

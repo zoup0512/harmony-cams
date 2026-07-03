@@ -86,7 +86,7 @@ export struct NvrMainTopBar {
 @Component
 export struct CameraHomeScreen {
   @Prop cameras: CameraDevice[] = [];
-  snapshots: RecordingFile[] = [];
+  @Prop snapshots: RecordingFile[] = [];
   selectedCameraId: string = '';
   playingCameraId: string = '';
   accentColor: string = '#20B486';
