@@ -419,6 +419,8 @@ export struct PlaybackFullscreenScreen {
   @State controlsVisible: boolean = true;
   @State zoomScale: number = 1.0;
   @State showPtzPad: boolean = false;
+  @Prop videoWidth: number = 0;
+  @Prop videoHeight: number = 0;
   private controlsTimerId: number = -1;
   private xComponentController: XComponentController = new XComponentController();
 
@@ -452,12 +454,13 @@ export struct PlaybackFullscreenScreen {
             this.onBindSurface(surfaceId);
           })
           .width('100%')
-          .height('100%')
+          .aspectRatio(this.videoWidth > 0 && this.videoHeight > 0 ? this.videoWidth / this.videoHeight : undefined)
           .scale({ x: this.zoomScale, y: this.zoomScale })
       }
       .width('100%')
       .height('100%')
       .backgroundColor('#000000')
+      .justifyContent(FlexAlign.Center)
       .gesture(
         SwipeGesture({ speed: 0.3 })
           .onAction((event: GestureEvent) => {

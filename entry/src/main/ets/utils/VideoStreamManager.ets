@@ -16,6 +16,8 @@ export class VideoStreamManager {
   private isShuttingDown: boolean = false;
   private hasVideoOutput: boolean = false;
   private surfaceId: string | null = null;
+  private videoWidth: number = 0;
+  private videoHeight: number = 0;
 
   private constructor(context: common.Context) {
     this.context = context;
@@ -34,6 +36,14 @@ export class VideoStreamManager {
 
   hasVideoOutputFlag(): boolean {
     return this.hasVideoOutput;
+  }
+
+  getVideoWidth(): number {
+    return this.videoWidth;
+  }
+
+  getVideoHeight(): number {
+    return this.videoHeight;
   }
 
   setSurfaceId(surfaceId: string | null) {
@@ -156,6 +166,8 @@ export class VideoStreamManager {
       player.on('videoSizeChange', (width: number, height: number) => {
         const elapsed = Date.now() - startTime;
         console.info(`VideoStreamManager videoSizeChange: ${width}x${height}, elapsedMs=${elapsed}, url=${streamUrl}`);
+        this.videoWidth = width;
+        this.videoHeight = height;
         this.hasVideoOutput = true;
       });
 
@@ -232,6 +244,8 @@ export class VideoStreamManager {
     }
     this.currentPlayer = null;
     this.hasVideoOutput = false;
+    this.videoWidth = 0;
+    this.videoHeight = 0;
     this.lastDiagnosticMessage = '已手动停止';
   }
 

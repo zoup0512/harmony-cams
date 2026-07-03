@@ -82,6 +82,8 @@ struct MainPage {
   @State playbackControlPlaying: boolean = false;
   @State controlsVisible: boolean = true;
   @State isVideoReady: boolean = false;
+  @State videoWidth: number = 0;
+  @State videoHeight: number = 0;
   @State surfaceId: string = '';
   @State isMuted: boolean = false;
   @State lastNonZeroVolume: number = 100;
@@ -169,9 +171,17 @@ struct MainPage {
       if (hasVideo && !this.isVideoReady) {
         this.isVideoReady = true;
       }
+      const vw = this.vm.streamManager.getVideoWidth();
+      const vh = this.vm.streamManager.getVideoHeight();
+      if (vw !== this.videoWidth || vh !== this.videoHeight) {
+        this.videoWidth = vw;
+        this.videoHeight = vh;
+      }
     } else {
       this.playbackControlPlaying = false;
       this.isVideoReady = false;
+      this.videoWidth = 0;
+      this.videoHeight = 0;
     }
 
     // Handle pending playback request
@@ -648,6 +658,8 @@ struct MainPage {
       isMuted: this.isMuted,
       isVideoReady: this.isVideoReady,
       isRecording: this.uiState.playback.isRecording,
+      videoWidth: this.videoWidth,
+      videoHeight: this.videoHeight,
       accentColor: this.colors.primary,
       onPrimaryColor: this.colors.onPrimary,
       errorColor: this.colors.error,
