@@ -116,6 +116,17 @@ struct MainPage {
 
   onPageShow(): void {
     this.isPageHidden = false;
+    if (this.vm && this.uiState.playback.isPlaybackFullscreen && !this.uiState.playback.playingCameraId) {
+      const resumeId = this.uiState.playback.lastRequestedPlaybackCameraId;
+      if (resumeId) {
+        const cam = this.cameras.find(c => c.id === resumeId);
+        if (cam) {
+          console.info(`MainPage onPageShow: resuming playback after background, cameraId=${resumeId}`);
+          this.vm.queuePendingPlaybackResume(cam);
+          this.syncState();
+        }
+      }
+    }
   }
 
   onPageHide(): void {
