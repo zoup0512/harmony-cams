@@ -507,7 +507,7 @@ export struct AddCameraFormScreen {
         .onClick(() => this.onSave())
     }
     .width('100%')
-    .height('100%')
+    .layoutWeight(1)
     .backgroundColor(this.bgColor)
     .padding({ left: 18, right: 18 })
   }
@@ -687,7 +687,7 @@ export struct AddCameraVerificationScreen {
         .onClick(() => this.onSave())
     }
     .width('100%')
-    .height('100%')
+    .layoutWeight(1)
     .backgroundColor(this.bgColor)
     .padding({ left: 18, right: 18 })
   }
