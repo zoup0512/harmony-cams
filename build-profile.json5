@@ -45,6 +45,18 @@
           ]
         }
       ]
+    },
+    {
+      "name": "libwlmedia",
+      "srcPath": "./libwlmedia",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
     }
   ]
 }

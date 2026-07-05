@@ -12,6 +12,7 @@ export enum DeviceFlowStep {
   Landing = 'Landing',
   Form = 'Form',
   Verifying = 'Verifying',
+  VendorPicker = 'VendorPicker',
 }
 
 export interface VerificationPreview {

@@ -574,6 +574,9 @@ export class NvrViewModel {
   onManageNameChange(v: string): void {
     this.uiState.deviceForm.manageName = v;
   }
+  onManageVendorChange(v: string): void {
+    this.uiState.deviceForm.manageVendor = v;
+  }
   onManageStreamSchemeChange(v: string): void {
     this.uiState.deviceForm.manageStreamScheme = v;
   }

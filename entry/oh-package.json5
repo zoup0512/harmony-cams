@@ -6,6 +6,7 @@
   "author": "",
   "license": "Apache-2.0",
   "dependencies": {
-    "rtspencoder": "file:./src/main/cpp/types/rtspencoder"
+    "rtspencoder": "file:./src/main/cpp/types/rtspencoder",
+    "@ywl5320/libwlmedia": "file:../libwlmedia"
   }
 }

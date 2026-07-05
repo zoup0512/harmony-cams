@@ -6,7 +6,7 @@ import { NvrViewModel } from '../viewmodel/NvrViewModel';
 import { DeviceFlowStep, VerificationPreview, PlaybackStreamType, sanitizePlaybackUrl, buildPlaybackUrl, defaultPlaybackPort, playbackStreamTypeFromScheme, enrichCameraRtspUrl, cameraBadge, snapshotCameraKey } from '../utils/PlaybackModels';
 import { NvrColors, getColors, AppearanceThemeState } from '../theme/NvrTheme';
 import { NvrMainTopBar, NvrBottomBar, CameraHomeScreen, PlaybackFullscreenScreen, CameraActionOverlay } from '../components/NvrShellComponents';
-import { DeviceManageTopBar, AddCameraLandingScreen, AddCameraFormScreen, AddCameraVerificationScreen } from '../components/DeviceManageComponents';
+import { DeviceManageTopBar, AddCameraLandingScreen, AddCameraFormScreen, AddCameraVerificationScreen, ManufacturerPickerScreen } from '../components/DeviceManageComponents';
 import { BrowseScreen } from '../components/BrowseScreen';
 import { ActivityStreamScreen, SnapshotScreen, SettingsHomeScreen } from '../components/NvrSecondaryScreens';
 import { RecordingPreviewDialog, DeleteSnapshotConfirmDialog } from '../components/NvrDialogComponents';
@@ -573,10 +573,15 @@ struct MainPage {
           this.syncState();
         },
         onBack: () => {
-          this.vm?.onDeviceFlowStepChange(
-            this.uiState.deviceForm.selectedDeviceId === null
-              ? DeviceFlowStep.Landing : DeviceFlowStep.Form
-          );
+          if (this.uiState.deviceForm.deviceFlowStep === DeviceFlowStep.Verifying
+            || this.uiState.deviceForm.deviceFlowStep === DeviceFlowStep.VendorPicker) {
+            this.vm?.onDeviceFlowStepChange(DeviceFlowStep.Form);
+          } else {
+            this.vm?.onDeviceFlowStepChange(
+              this.uiState.deviceForm.selectedDeviceId === null
+                ? DeviceFlowStep.Landing : DeviceFlowStep.Form
+            );
+          }
           this.syncState();
         },
       })
@@ -596,10 +601,26 @@ struct MainPage {
             });
           },
         })
+      } else if (this.uiState.deviceForm.deviceFlowStep === DeviceFlowStep.VendorPicker) {
+        ManufacturerPickerScreen({
+          selectedVendor: this.uiState.deviceForm.manageVendor,
+          bgColor: this.colors.background,
+          surfaceColor: this.colors.surface,
+          onSurfaceColor: this.colors.onSurface,
+          onSurfaceVariantColor: this.colors.onSurfaceVariant,
+          accentColor: this.colors.primary,
+          outlineVariantColor: this.colors.outlineVariant,
+          onSelectVendor: (v: string) => {
+            this.vm?.onManageVendorChange(v);
+            this.vm?.onDeviceFlowStepChange(DeviceFlowStep.Form);
+            this.syncState();
+          },
+        })
       } else if (this.uiState.deviceForm.deviceFlowStep === DeviceFlowStep.Verifying) {
         AddCameraVerificationScreen({
           result: this.uiState.deviceForm.verificationResult,
           forceHttpSoftwareDecode: this.uiState.deviceForm.forceHttpSoftwareDecode,
+          manageName: this.uiState.deviceForm.manageName,
           bgColor: this.colors.background,
           surfaceColor: this.colors.surface,
           onSurfaceColor: this.colors.onSurface,
@@ -607,6 +628,7 @@ struct MainPage {
           accentColor: this.colors.primary,
           onPrimaryColor: this.colors.onPrimary,
           primaryColor: this.colors.primary,
+          onNameChange: (v: string) => { this.vm?.onManageNameChange(v); this.syncState(); },
           onSave: () => {
             this.vm?.saveVerifiedDevice().then(() => this.syncState());
           },
@@ -614,6 +636,7 @@ struct MainPage {
       } else {
         AddCameraFormScreen({
           manageName: this.uiState.deviceForm.manageName,
+          manageVendor: this.uiState.deviceForm.manageVendor,
           manageStreamScheme: this.uiState.deviceForm.manageStreamScheme,
           manageHost: this.uiState.deviceForm.manageHost,
           managePort: this.uiState.deviceForm.managePort,
@@ -640,6 +663,10 @@ struct MainPage {
           onManagePasswordChange: (v: string) => { this.vm?.onManagePasswordChange(v); this.syncState(); },
           onTogglePasswordVisible: () => { this.vm?.onManagePasswordVisibleChange(!this.uiState.deviceForm.managePasswordVisible); this.syncState(); },
           onForceHttpSoftwareDecodeChange: (v: boolean) => { this.vm?.onForceHttpSoftwareDecodeChange(v); this.syncState(); },
+          onOpenVendorPicker: () => {
+            this.vm?.onDeviceFlowStepChange(DeviceFlowStep.VendorPicker);
+            this.syncState();
+          },
           onSave: () => { this.vm?.submitFormToVerification(); this.syncState(); },
         })
       }
@@ -744,10 +771,11 @@ struct MainPage {
   private getDeviceManageTitle(): string {
     switch (this.uiState.deviceForm.deviceFlowStep) {
       case DeviceFlowStep.Landing: return '添加相机';
-      case DeviceFlowStep.Verifying: return '正在验证';
+      case DeviceFlowStep.Verifying: return '';
+      case DeviceFlowStep.VendorPicker: return '选择制造商';
       case DeviceFlowStep.Form:
         return this.uiState.deviceForm.selectedDeviceId === null
-          ? '新建照相机'
+          ? ''
           : (this.uiState.deviceForm.manageName || '设备设置');
       default: return '';
     }

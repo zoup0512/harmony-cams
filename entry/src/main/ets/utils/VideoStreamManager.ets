@@ -2,6 +2,7 @@ import { media } from '@kit.MediaKit';
 import { image } from '@kit.ImageKit';
 import { common } from '@kit.AbilityKit';
 import { CameraDevice } from '../model/CameraDevice';
+import { WlPlayer, WlComponentController, WlCompleteType, WlLoadStatus, WlCodecType, WlAudioInterruptType, WlAudioInterruptHint, WlTrackType } from '@ywl5320/libwlmedia';
 
 export enum PlaybackRenderMode {
   TEXTURE_HARDWARE = 'TEXTURE_HARDWARE',
@@ -18,6 +19,10 @@ export class VideoStreamManager {
   private surfaceId: string | null = null;
   private videoWidth: number = 0;
   private videoHeight: number = 0;
+  private wlPlayer: WlPlayer | null = null;
+  private wlComponentController: WlComponentController | null = null;
+  private usingWlPlayer: boolean = false;
+  private wlPlayerPlaying: boolean = false;
 
   private constructor(context: common.Context) {
     this.context = context;
@@ -76,6 +81,11 @@ export class VideoStreamManager {
       await this.stopStream();
       this.hasVideoOutput = false;
       camera.isConnected = false;
+
+      if (streamType === 'rtsp') {
+        console.info(`VideoStreamManager startStream: RTSP detected, using WlPlayer (wlmedia)...`);
+        return await this.startStreamWlPlayer(camera, streamUrl, streamType);
+      }
 
       console.info(`VideoStreamManager startStream: creating AVPlayer...`);
       const player = await media.createAVPlayer();
@@ -234,6 +244,24 @@ export class VideoStreamManager {
   }
 
   async stopStream(): Promise<void> {
+    if (this.usingWlPlayer) {
+      console.info(`VideoStreamManager stopStream: stopping WlPlayer...`);
+      try {
+        this.wlPlayer?.stop();
+        this.wlPlayer?.release();
+      } catch (e) {
+        console.error(`VideoStreamManager stopStream: WlPlayer stop failed: ${(e as Error).message}`);
+      }
+      this.wlPlayer = null;
+      this.wlComponentController = null;
+      this.usingWlPlayer = false;
+      this.wlPlayerPlaying = false;
+      this.hasVideoOutput = false;
+      this.videoWidth = 0;
+      this.videoHeight = 0;
+      this.lastDiagnosticMessage = '已手动停止';
+      return;
+    }
     const player = this.currentPlayer;
     if (!player) return;
     try {
@@ -250,6 +278,10 @@ export class VideoStreamManager {
   }
 
   async play(): Promise<void> {
+    if (this.usingWlPlayer) {
+      try { this.wlPlayer?.resume(); } catch (e) { console.error(`VideoStreamManager play: WlPlayer resume failed: ${(e as Error).message}`); }
+      return;
+    }
     if (this.currentPlayer) {
       const state = this.currentPlayer.state;
       if (state !== 'prepared' && state !== 'paused' && state !== 'completed' && state !== 'playing') {
@@ -265,6 +297,10 @@ export class VideoStreamManager {
   }
 
   async pause(): Promise<void> {
+    if (this.usingWlPlayer) {
+      try { this.wlPlayer?.pause(); } catch (e) { console.error(`VideoStreamManager pause: WlPlayer pause failed: ${(e as Error).message}`); }
+      return;
+    }
     if (this.currentPlayer) {
       try {
         await this.currentPlayer.pause();
@@ -275,12 +311,19 @@ export class VideoStreamManager {
   }
 
   setVolume(volume: number): void {
+    if (this.usingWlPlayer) {
+      this.wlPlayer?.setVolume(volume * 2);
+      return;
+    }
     if (this.currentPlayer) {
       this.currentPlayer.setVolume(volume / 100);
     }
   }
 
   getVolume(): number {
+    if (this.usingWlPlayer) {
+      return this.wlPlayer ? Math.round(this.wlPlayer.getVolume() / 2) : 0;
+    }
     if (this.currentPlayer) {
       return Math.round((this.currentPlayer.state === 'playing' ? 100 : 0));
     }
@@ -288,6 +331,9 @@ export class VideoStreamManager {
   }
 
   isPlaying(): boolean {
+    if (this.usingWlPlayer) {
+      return this.wlPlayerPlaying;
+    }
     if (this.currentPlayer) {
       return this.currentPlayer.state === 'playing';
     }
@@ -300,8 +346,8 @@ export class VideoStreamManager {
 
   async captureSurfaceFrame(): Promise<image.PixelMap | null> {
     const sid = this.surfaceId;
-    const hasPlayer = this.currentPlayer !== null;
-    const playerState = hasPlayer ? this.currentPlayer!.state : 'null';
+    const hasPlayer = this.currentPlayer !== null || this.usingWlPlayer;
+    const playerState = this.usingWlPlayer ? 'wlplayer' : (this.currentPlayer ? this.currentPlayer.state : 'null');
     console.info(`VideoStreamManager captureSurfaceFrame: BEGIN surfaceId='${sid}', hasPlayer=${hasPlayer}, playerState=${playerState}, hasVideoOutput=${this.hasVideoOutput}`);
     if (!sid || !hasPlayer || !this.hasVideoOutput) {
       console.warn(`VideoStreamManager captureSurfaceFrame: SKIPPED surfaceId='${sid}', hasPlayer=${hasPlayer}, hasVideoOutput=${this.hasVideoOutput}`);
@@ -324,5 +370,144 @@ export class VideoStreamManager {
     await this.stopStream();
     this.isShuttingDown = false;
     VideoStreamManager.instance = null;
+  }
+
+  private async startStreamWlPlayer(camera: CameraDevice, streamUrl: string, streamType: string): Promise<media.AVPlayer | null> {
+    const startTime = Date.now();
+    console.info(`VideoStreamManager startStreamWlPlayer BEGIN: url=${streamUrl}, surfaceId=${this.surfaceId}`);
+
+    if (!this.surfaceId) {
+      this.lastDiagnosticMessage = 'SurfaceId 未就绪，无法播放 RTSP';
+      console.error(`VideoStreamManager startStreamWlPlayer: surfaceId is null`);
+      return null;
+    }
+
+    try {
+      const player = new WlPlayer();
+      this.wlPlayer = player;
+      this.usingWlPlayer = true;
+
+      const wlComponentController = new WlComponentController(player);
+      this.wlComponentController = wlComponentController;
+      player.setClearLastVideoFrame(wlComponentController.getUniqueNum(), false);
+      player.setCodecType(WlCodecType.WL_CODEC_SOFT);
+      player.setBufferSize(1, 15);
+      player.setTimeOut(15);
+
+      let onPrepared: (() => void) | null = null;
+      let onError: ((msg: string) => void) | null = null;
+      let onFirstFrame: (() => void) | null = null;
+
+      player.setOnMediaInfoListener({
+        onPrepared: (): void => {
+          console.info(`VideoStreamManager WlPlayer onPrepared`);
+          this.lastDiagnosticMessage = 'RTSP流已准备就绪';
+          if (onPrepared) { onPrepared(); }
+        },
+        onTimeInfo: (currentTime: number, bufferTime: number): void => {
+        },
+        onComplete: (wlCompleteType: WlCompleteType, msg: string): void => {
+          console.info(`VideoStreamManager WlPlayer onComplete: type=${wlCompleteType}, msg=${msg}`);
+          if (wlCompleteType === WlCompleteType.WL_COMPLETE_ERROR) {
+            this.lastDiagnosticMessage = `RTSP播放错误: ${msg}`;
+            this.wlPlayerPlaying = false;
+            camera.isConnected = false;
+            if (onError) { onError(msg); }
+          } else if (wlCompleteType === WlCompleteType.WL_COMPLETE_HANDLE) {
+            this.lastDiagnosticMessage = 'RTSP流已停止';
+            this.wlPlayerPlaying = false;
+            camera.isConnected = false;
+          } else if (wlCompleteType === WlCompleteType.WL_COMPLETE_TIMEOUT) {
+            this.lastDiagnosticMessage = 'RTSP连接超时';
+            this.wlPlayerPlaying = false;
+            camera.isConnected = false;
+            if (onError) { onError('RTSP连接超时'); }
+          }
+        },
+        onLoadInfo: (wlLoadStatus: WlLoadStatus, progress: number, speed: number): void => {
+          if (wlLoadStatus === WlLoadStatus.WL_LOADING_STATUS_START) {
+            this.lastDiagnosticMessage = '正在加载RTSP流...';
+          } else if (wlLoadStatus === WlLoadStatus.WL_LOADING_STATUS_FINISH) {
+            this.lastDiagnosticMessage = 'RTSP流加载完成';
+          }
+        },
+        onFirstFrameRendered: (): void => {
+          console.info(`VideoStreamManager WlPlayer onFirstFrameRendered`);
+          this.hasVideoOutput = true;
+          this.wlPlayerPlaying = true;
+          camera.isConnected = true;
+          this.lastDiagnosticMessage = 'RTSP流已开始播放';
+          if (onFirstFrame) { onFirstFrame(); }
+        },
+        onSeekFinish: (): void => {
+        },
+        onAudioInterrupt: (type: WlAudioInterruptType, hint: WlAudioInterruptHint): void => {
+        },
+        onAutoPlay: (): void => {
+        },
+        onDeEncryptData: (mediaType: WlTrackType, data: Uint8Array): Uint8Array | null => {
+          return null;
+        },
+        onTakePicture: (pixelMap: image.PixelMap): void => {
+        }
+      });
+
+      player.setSurface(this.surfaceId, '#000000FF', wlComponentController.getUniqueNum());
+      player.setSource(streamUrl);
+      console.info(`VideoStreamManager startStreamWlPlayer: source set, calling prepare...`);
+      player.prepare();
+
+      console.info(`VideoStreamManager startStreamWlPlayer: waiting for prepared state (15s timeout)...`);
+      let timeoutId: number = -1;
+      await new Promise<void>((resolve, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error('timeout waiting for WlPlayer prepared state (15s)'));
+        }, 15000);
+        onPrepared = () => {
+          clearTimeout(timeoutId);
+          resolve();
+        };
+        onError = (msg: string) => {
+          clearTimeout(timeoutId);
+          reject(new Error(msg));
+        };
+      });
+      onPrepared = null;
+      onError = null;
+
+      console.info(`VideoStreamManager startStreamWlPlayer: prepared, calling start...`);
+      player.start();
+
+      console.info(`VideoStreamManager startStreamWlPlayer: waiting for first frame (15s timeout)...`);
+      await new Promise<void>((resolve, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error('timeout waiting for WlPlayer first frame (15s)'));
+        }, 15000);
+        onFirstFrame = () => {
+          clearTimeout(timeoutId);
+          resolve();
+        };
+        onError = (msg: string) => {
+          clearTimeout(timeoutId);
+          reject(new Error(msg));
+        };
+      });
+      onFirstFrame = null;
+      onError = null;
+
+      const totalCost = Date.now() - startTime;
+      console.info(`VideoStreamManager startStreamWlPlayer END: success, totalCostMs=${totalCost}, streamType=${streamType}`);
+      return { state: 'playing' } as media.AVPlayer;
+    } catch (e) {
+      const errMsg = (e as Error).message;
+      console.error(`VideoStreamManager startStreamWlPlayer EXCEPTION: msg=${errMsg}, url=${streamUrl}`);
+      this.lastDiagnosticMessage = `RTSP启动异常: ${errMsg}`;
+      this.usingWlPlayer = false;
+      this.wlPlayerPlaying = false;
+      try { this.wlPlayer?.release(); } catch (e) { console.error(`VideoStreamManager startStreamWlPlayer: release failed: ${(e as Error).message}`); }
+      this.wlPlayer = null;
+      this.wlComponentController = null;
+      return null;
+    }
   }
 }
