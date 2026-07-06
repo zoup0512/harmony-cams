@@ -22,6 +22,7 @@ import {
   NvrSettingsState, defaultSettingsState, defaultDeviceFormState, defaultPlaybackState,
 } from './NvrUiState';
 import { AppearanceThemeState } from '../theme/NvrTheme';
+import { checkCameraReachable, HealthCheckResult } from '../utils/CameraHealthChecker';
 
 function safeShowToast(message: string): void {
   try {
@@ -187,29 +188,48 @@ export class NvrViewModel {
     this.updateFilteredCameras();
   }
 
+  private healthCheckRunning = false;
+  private readonly healthCheckTimeoutMs = 3000;
+
   async checkCameraHealth(): Promise<void> {
-    for (const camera of this.cameras) {
-      if (camera.rtspUrl === '') {
-        camera.isConnected = false;
-        camera.connectionQuality = 'unknown';
-        continue;
-      }
-      try {
-        const parsed = parsePlaybackUrl(camera.rtspUrl);
-        if (parsed.host === '') {
+    if (this.healthCheckRunning) {
+      console.info('checkCameraHealth: already running, skipping');
+      return;
+    }
+    this.healthCheckRunning = true;
+    try {
+      const camerasToCheck = this.cameras.filter(c => c.rtspUrl && c.rtspUrl.trim() !== '');
+      for (const camera of camerasToCheck) {
+        if (camera.rtspUrl === '') {
           camera.isConnected = false;
           camera.connectionQuality = 'unknown';
           continue;
         }
-        camera.isConnected = true;
-        camera.lastSeen = Date.now();
-        camera.connectionQuality = 'good';
-      } catch {
-        camera.isConnected = false;
-        camera.connectionQuality = 'poor';
+        try {
+          const result = await checkCameraReachable(camera, this.healthCheckTimeoutMs);
+          if (result.reachable) {
+            camera.isConnected = true;
+            camera.lastSeen = Date.now();
+            if (result.latencyMs < 500) {
+              camera.connectionQuality = 'good';
+            } else if (result.latencyMs < 1500) {
+              camera.connectionQuality = 'fair';
+            } else {
+              camera.connectionQuality = 'poor';
+            }
+          } else {
+            camera.isConnected = false;
+            camera.connectionQuality = 'unknown';
+          }
+        } catch {
+          camera.isConnected = false;
+          camera.connectionQuality = 'unknown';
+        }
       }
+      this.updateFilteredCameras();
+    } finally {
+      this.healthCheckRunning = false;
     }
-    this.updateFilteredCameras();
   }
 
   async reloadRecordings(): Promise<void> {

@@ -92,6 +92,7 @@ struct MainPage {
   @State cameraFilter: string = 'all';
   @State isAppLocked: boolean = false;
   @State pinInput: string = '';
+  @State isInitializing: boolean = true;
   private pollTimerId: number = -1;
   private controlsTimerId: number = -1;
   private videoPollTimerId: number = -1;
@@ -154,6 +155,7 @@ struct MainPage {
     if (!this.vm) return;
     await this.vm.init();
     this.syncState();
+    this.isInitializing = false;
     this.startPlaybackPolling();
   }
 
@@ -281,31 +283,47 @@ struct MainPage {
         } else {
           Column() {
             this.MainTopBar()
-            Scroll() {
+            if (this.isInitializing) {
               Column() {
-                if (this.uiState.selectedTab === 0) {
-                  CameraHomeScreen({
-                    cameras: this.filteredCameras,
-                    snapshots: this.snapshots,
-                    selectedCameraId: this.getSelectedCameraForGrid()?.id ?? '',
-                    playingCameraId: this.uiState.playback.playingCameraId ?? '',
-                    accentColor: this.colors.primary,
-                    bgColor: this.colors.background,
-                    surfaceColor: this.colors.surface,
-                    surfaceVariantColor: this.colors.surfaceVariant,
-                    onBackgroundColor: this.colors.onBackground,
-                    onSurfaceVariantColor: this.colors.onSurfaceVariant,
-                    onPrimaryColor: this.colors.onPrimary,
-                    secondaryContainerColor: this.colors.secondaryContainer,
-                    errorColor: this.colors.error,
-                    searchQuery: this.searchQuery,
-                    cameraFilter: this.cameraFilter,
-                    onCameraClick: (device: CameraDevice) => this.onCameraClick(device),
-                    onCameraLongPress: (device: CameraDevice) => this.onCameraLongPress(device),
-                    onAddCamera: () => this.onAddCamera(),
-                    onSearchChange: (q: string) => { this.vm?.setSearchQuery(q); this.syncState(); },
-                    onFilterChange: (f: string) => { this.vm?.setCameraFilter(f as 'all' | 'online' | 'offline'); this.syncState(); },
-                  })
+                LoadingProgress()
+                  .width(48)
+                  .height(48)
+                  .color(this.colors.primary)
+                Text('加载中...')
+                  .fontSize(14)
+                  .fontColor(this.colors.onSurfaceVariant)
+                  .margin({ top: 12 })
+              }
+              .width('100%')
+              .height('100%')
+              .justifyContent(FlexAlign.Center)
+              .alignItems(HorizontalAlign.Center)
+            } else {
+              Scroll() {
+                Column() {
+                  if (this.uiState.selectedTab === 0) {
+                    CameraHomeScreen({
+                      cameras: this.filteredCameras,
+                      snapshots: this.snapshots,
+                      selectedCameraId: this.getSelectedCameraForGrid()?.id ?? '',
+                      playingCameraId: this.uiState.playback.playingCameraId ?? '',
+                      accentColor: this.colors.primary,
+                      bgColor: this.colors.background,
+                      surfaceColor: this.colors.surface,
+                      surfaceVariantColor: this.colors.surfaceVariant,
+                      onBackgroundColor: this.colors.onBackground,
+                      onSurfaceVariantColor: this.colors.onSurfaceVariant,
+                      onPrimaryColor: this.colors.onPrimary,
+                      secondaryContainerColor: this.colors.secondaryContainer,
+                      errorColor: this.colors.error,
+                      searchQuery: this.searchQuery,
+                      cameraFilter: this.cameraFilter,
+                      onCameraClick: (device: CameraDevice) => this.onCameraClick(device),
+                      onCameraLongPress: (device: CameraDevice) => this.onCameraLongPress(device),
+                      onAddCamera: () => this.onAddCamera(),
+                      onSearchChange: (q: string) => { this.vm?.setSearchQuery(q); this.syncState(); },
+                      onFilterChange: (f: string) => { this.vm?.setCameraFilter(f as 'all' | 'online' | 'offline'); this.syncState(); },
+                    })
                 } else if (this.uiState.selectedTab === 1) {
                   BrowseScreen({
                     accentColor: this.colors.primary,
@@ -402,6 +420,7 @@ struct MainPage {
               onPrimaryColor: this.colors.onPrimary,
               onTabSelected: (index: number) => this.onTabSelected(index),
             })
+            }
           }
         }
       }
