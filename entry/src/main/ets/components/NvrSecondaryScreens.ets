@@ -13,22 +13,22 @@ interface SnapshotGroup {
   items: RecordingFile[];
 }
 
-function formatDateGroupLabel(timestamp: number): string {
+function formatDateGroupLabel(timestamp: number, context: common.Context): string {
   const date = new Date(timestamp);
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterdayStart = new Date(todayStart.getTime() - 86400000);
   const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  if (dateStart.getTime() === todayStart.getTime()) return getContext(this).resourceManager.getStringByNameSync('date_today');
-  if (dateStart.getTime() === yesterdayStart.getTime()) return getContext(this).resourceManager.getStringByNameSync('date_yesterday');
-  return getContext(this).resourceManager.getStringByNameSync('date_format_long').replace('%d', String(date.getFullYear())).replace('%d', String(date.getMonth() + 1)).replace('%d', String(date.getDate()));
+  if (dateStart.getTime() === todayStart.getTime()) return context.resourceManager.getStringByNameSync('date_today');
+  if (dateStart.getTime() === yesterdayStart.getTime()) return context.resourceManager.getStringByNameSync('date_yesterday');
+  return context.resourceManager.getStringByNameSync('date_format_long').replace('%d', String(date.getFullYear())).replace('%d', String(date.getMonth() + 1)).replace('%d', String(date.getDate()));
 }
 
-function groupSnapshotsByDate(snapshots: RecordingFile[]): SnapshotGroup[] {
+function groupSnapshotsByDate(snapshots: RecordingFile[], context: common.Context): SnapshotGroup[] {
   const groups: SnapshotGroup[] = [];
   for (const s of snapshots) {
     const ts = s.startTime ?? 0;
-    const label = ts > 0 ? formatDateGroupLabel(ts) : getContext(this).resourceManager.getStringByNameSync('date_unknown');
+    const label = ts > 0 ? formatDateGroupLabel(ts, context) : context.resourceManager.getStringByNameSync('date_unknown');
     let group = groups.find(g => g.label === label);
     if (!group) {
       group = { label, items: [] };
@@ -63,6 +63,20 @@ export struct ActivityStreamScreen {
   private streamManager: CameraStreamManager | null = null;
   private xComponentController: XComponentController = new XComponentController();
   private previewSurfaceId: string = '';
+
+  buildRtmpUrl(): string {
+    const host = this.rtmpUrlInput.replace(/^rtmp:\/\//i, '');
+    return `rtmp://${host}/${this.rtmpStreamKeyInput}`;
+  }
+
+  streamTargetText(): Resource | string {
+    if (this.selectedStreamTool === 'rtmp') {
+      return this.rtmpUrlInput
+        ? $r('app.string.stream_target', this.buildRtmpUrl())
+        : $r('app.string.rtmp_target_not_configured');
+    }
+    return $r('app.string.stream_address', this.rtspAddress);
+  }
 
   aboutToAppear(): void {
     this.rtspAddress = buildPhoneRtspAddress();
@@ -186,9 +200,7 @@ export struct ActivityStreamScreen {
             .margin({ top: 12 })
             .clip(true)
 
-            Text(this.selectedStreamTool === 'rtmp'
-              ? (this.rtmpUrlInput ? $r('app.string.stream_target', `rtmp://${this.rtmpUrlInput.replace(/^rtmp:\/\//i, '')}/${this.rtmpStreamKeyInput}`) : $r('app.string.rtmp_target_not_configured'))
-              : $r('app.string.stream_address', this.rtspAddress))
+            Text(this.streamTargetText())
               .fontSize(12)
               .fontColor(this.onSurfaceVariantColor)
               .margin({ top: 12 })
@@ -304,7 +316,7 @@ export struct SnapshotScreen {
             .fontSize(16)
             .fontColor(this.onSurfaceVariantColor)
         } else {
-        ForEach(groupSnapshotsByDate(this.snapshots), (group: SnapshotGroup) => {
+        ForEach(groupSnapshotsByDate(this.snapshots, getContext(this)), (group: SnapshotGroup) => {
           Text(group.label)
             .fontSize(16)
             .fontColor(this.onSurfaceColor)

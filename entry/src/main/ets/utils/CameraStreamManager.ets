@@ -244,7 +244,7 @@ export class CameraStreamManager {
           });
           return;
         }
-        this.rtmpPushManager = new RtmpPushManager();
+        this.rtmpPushManager = new RtmpPushManager(this.context);
         this.rtmpPushManager.setContext(this.context);
         this.rtmpPushManager.setOnStatusChange((status: RtmpPushStatus, message?: string) => {
           if (message) this.rtmpStatusText = message;

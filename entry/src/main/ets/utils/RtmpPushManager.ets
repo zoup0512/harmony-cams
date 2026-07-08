@@ -254,6 +254,10 @@ export class RtmpPushManager {
   private startPts: number = 0;
   private hasFirstTimestamp: boolean = false;
 
+  constructor(context: common.Context) {
+    this.context = context;
+  }
+
   setContext(context: common.Context): void {
     this.context = context;
   }
