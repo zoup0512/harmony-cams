@@ -19,16 +19,16 @@ function formatDateGroupLabel(timestamp: number): string {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterdayStart = new Date(todayStart.getTime() - 86400000);
   const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  if (dateStart.getTime() === todayStart.getTime()) return '今天';
-  if (dateStart.getTime() === yesterdayStart.getTime()) return '昨天';
-  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+  if (dateStart.getTime() === todayStart.getTime()) return getContext(this).resourceManager.getStringByNameSync('date_today');
+  if (dateStart.getTime() === yesterdayStart.getTime()) return getContext(this).resourceManager.getStringByNameSync('date_yesterday');
+  return getContext(this).resourceManager.getStringByNameSync('date_format_long').replace('%d', String(date.getFullYear())).replace('%d', String(date.getMonth() + 1)).replace('%d', String(date.getDate()));
 }
 
 function groupSnapshotsByDate(snapshots: RecordingFile[]): SnapshotGroup[] {
   const groups: SnapshotGroup[] = [];
   for (const s of snapshots) {
     const ts = s.startTime ?? 0;
-    const label = ts > 0 ? formatDateGroupLabel(ts) : '未知日期';
+    const label = ts > 0 ? formatDateGroupLabel(ts) : getContext(this).resourceManager.getStringByNameSync('date_unknown');
     let group = groups.find(g => g.label === label);
     if (!group) {
       group = { label, items: [] };
@@ -57,7 +57,7 @@ export struct ActivityStreamScreen {
   @State selectedStreamTool: string = 'rtsp';
   @State isStreaming: boolean = false;
   @State useFrontCamera: boolean = false;
-  @State statusText: string = '未启动';
+  @State statusText: string = '';
   @State rtspAddress: string = buildPhoneRtspAddress();
   @State clientCount: number = 0;
   private streamManager: CameraStreamManager | null = null;
@@ -85,7 +85,7 @@ export struct ActivityStreamScreen {
   build(): void {
     Column() {
         Row({ space: 10 }) {
-          Text('RTSP 服务器')
+          Text($r('app.string.rtsp_server'))
               .fontSize(14)
               .fontColor(this.selectedStreamTool === 'rtsp' ? this.onPrimaryColor : this.onSurfaceVariantColor)
               .fontWeight(this.selectedStreamTool === 'rtsp' ? FontWeight.Medium : FontWeight.Normal)
@@ -101,7 +101,7 @@ export struct ActivityStreamScreen {
                 }
               })
 
-            Text('RTMP 推流')
+            Text($r('app.string.rtmp_stream'))
               .fontSize(14)
               .fontColor(this.selectedStreamTool === 'rtmp' ? this.onPrimaryColor : this.onSurfaceVariantColor)
               .fontWeight(this.selectedStreamTool === 'rtmp' ? FontWeight.Medium : FontWeight.Normal)
@@ -129,7 +129,7 @@ export struct ActivityStreamScreen {
           Column() {
             Row() {
               Column() {
-                Text(this.selectedStreamTool === 'rtmp' ? 'RTMP 推流到服务器' : '手机摄像头 RTSP 推流')
+                Text(this.selectedStreamTool === 'rtmp' ? $r('app.string.rtmp_stream_to_server') : $r('app.string.phone_rtsp_stream'))
                   .fontSize(16)
                   .fontColor(this.onSurfaceColor)
                   .fontWeight(FontWeight.Bold)
@@ -141,7 +141,7 @@ export struct ActivityStreamScreen {
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
 
-              Text(this.isStreaming ? '运行中' : '待启动')
+              Text(this.isStreaming ? $r('app.string.status_running') : $r('app.string.status_standby_btn'))
                 .fontSize(12)
                 .fontColor(this.isStreaming ? this.onPrimaryColor : this.onSurfaceVariantColor)
                 .padding({ left: 12, right: 12, top: 6, bottom: 6 })
@@ -173,8 +173,8 @@ export struct ActivityStreamScreen {
                 .width('100%')
                 .height('100%')
 
-              if (!this.isStreaming && this.statusText === '未启动') {
-                Text('📷 预览区')
+              if (!this.isStreaming && this.statusText === '') {
+                Text($r('app.string.preview_area'))
                   .fontSize(16)
                   .fontColor('#FFFFFF80')
               }
@@ -187,14 +187,14 @@ export struct ActivityStreamScreen {
             .clip(true)
 
             Text(this.selectedStreamTool === 'rtmp'
-              ? (this.rtmpUrlInput ? `目标：rtmp://${this.rtmpUrlInput.replace(/^rtmp:\/\//i, '')}/${this.rtmpStreamKeyInput}` : '目标地址：请在设置中配置 RTMP 服务器')
-              : `推流地址：${this.rtspAddress}`)
+              ? (this.rtmpUrlInput ? $r('app.string.stream_target', `rtmp://${this.rtmpUrlInput.replace(/^rtmp:\/\//i, '')}/${this.rtmpStreamKeyInput}`) : $r('app.string.rtmp_target_not_configured'))
+              : $r('app.string.stream_address', this.rtspAddress))
               .fontSize(12)
               .fontColor(this.onSurfaceVariantColor)
               .margin({ top: 12 })
 
             Row({ space: 10 }) {
-              Button(this.useFrontCamera ? '切到后置' : '切到前置')
+              Button(this.useFrontCamera ? $r('app.string.switch_to_back') : $r('app.string.switch_to_front'))
                 .layoutWeight(1)
                 .onClick(() => {
                   if (this.streamManager) {
@@ -203,7 +203,7 @@ export struct ActivityStreamScreen {
                     });
                   }
                 })
-              Button(this.isStreaming ? '停止推流' : '开始推流')
+              Button(this.isStreaming ? $r('app.string.stop_stream') : $r('app.string.start_stream'))
                 .layoutWeight(1)
                 .onClick(() => {
                   if (this.isStreaming) {
@@ -231,14 +231,14 @@ export struct ActivityStreamScreen {
           .padding(16)
           .margin({ top: 14 })
 
-          Text('活动记录')
+          Text($r('app.string.activity_log'))
             .fontSize(16)
             .fontColor(this.onSurfaceVariantColor)
             .fontWeight(FontWeight.Medium)
             .margin({ top: 14, bottom: 4 })
 
           if (this.recordings.length === 0) {
-            Text('暂无活动记录')
+            Text($r('app.string.no_activity'))
               .fontSize(16)
               .fontColor(this.onSurfaceVariantColor)
               .width('100%')
@@ -263,7 +263,7 @@ export struct ActivityStreamScreen {
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
 
-                Text('查看')
+                Text($r('app.string.action_view'))
                   .fontSize(16)
                   .fontColor(this.accentColor)
                   .fontWeight(FontWeight.Medium)
@@ -300,7 +300,7 @@ export struct SnapshotScreen {
     Scroll() {
       Column() {
         if (this.snapshots.length === 0) {
-          Text('暂无快照')
+          Text($r('app.string.no_snapshots'))
             .fontSize(16)
             .fontColor(this.onSurfaceVariantColor)
         } else {
@@ -399,7 +399,7 @@ export struct SettingsHomeScreen {
   build(): void {
     Column() {
         // Appearance
-        Text('✨ 外观')
+        Text($r('app.string.section_appearance'))
           .fontSize(16)
           .fontColor(this.onSurfaceVariantColor)
           .fontWeight(FontWeight.Medium)
@@ -407,7 +407,7 @@ export struct SettingsHomeScreen {
 
         // Theme selector
         Row() {
-          Text('主题')
+          Text($r('app.string.settings_theme'))
             .fontSize(16)
             .fontColor(this.onSurfaceColor)
             .fontWeight(FontWeight.Bold)
@@ -415,9 +415,9 @@ export struct SettingsHomeScreen {
 
           Row({ space: 3 }) {
             ForEach([
-              { value: 'system', label: '系统' },
-              { value: 'light', label: '明亮' },
-              { value: 'dark', label: '暗' },
+              { value: 'system', label: getContext(this).resourceManager.getStringByNameSync('theme_system') },
+              { value: 'light', label: getContext(this).resourceManager.getStringByNameSync('theme_light') },
+              { value: 'dark', label: getContext(this).resourceManager.getStringByNameSync('theme_dark') },
             ], (item: ThemeOptionItem) => {
               Text(item.label)
                 .fontSize(14)
@@ -442,7 +442,7 @@ export struct SettingsHomeScreen {
         .padding({ left: 18, right: 18, top: 16, bottom: 16 })
 
         // Device options
-        Text('设备选项')
+        Text($r('app.string.section_device_options'))
           .fontSize(16)
           .fontColor(this.onSurfaceVariantColor)
           .fontWeight(FontWeight.Medium)
@@ -451,17 +451,17 @@ export struct SettingsHomeScreen {
         Column() {
           // Storage path
           Column() {
-            Text('存储路径')
+            Text($r('app.string.settings_storage_path'))
               .fontSize(13)
               .fontColor(this.onSurfaceVariantColor)
             Row() {
-              Text(this.storagePathInput || '点击选择存储目录')
+              Text(this.storagePathInput || $r('app.string.storage_path_hint'))
                 .fontSize(14)
                 .fontColor(this.storagePathInput ? this.onSurfaceColor : this.onSurfaceVariantColor)
                 .layoutWeight(1)
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
-              Text('选择')
+              Text($r('app.string.action_select'))
                 .fontSize(12)
                 .fontColor(this.accentColor)
                 .fontWeight(FontWeight.Medium)
@@ -480,7 +480,7 @@ export struct SettingsHomeScreen {
 
           // Recording quality
           Column() {
-            Text('录制质量')
+            Text($r('app.string.settings_recording_quality'))
               .fontSize(13)
               .fontColor(this.onSurfaceVariantColor)
             Row({ space: 8 }) {
@@ -507,10 +507,10 @@ export struct SettingsHomeScreen {
 
           // Recording duration
           Column() {
-            Text('录制时长')
+            Text($r('app.string.settings_recording_duration'))
               .fontSize(13)
               .fontColor(this.onSurfaceVariantColor)
-            TextInput({ text: this.recordingDurationInput, placeholder: '分钟数，如 30' })
+            TextInput({ text: this.recordingDurationInput, placeholder: $r('app.string.duration_hint') })
               .fontSize(14)
               .fontColor(this.onSurfaceColor)
               .backgroundColor(Color.Transparent)
@@ -528,11 +528,11 @@ export struct SettingsHomeScreen {
         // Background playback toggle
         Row() {
           Column() {
-            Text('允许后台播放')
+            Text($r('app.string.settings_bg_playback'))
               .fontSize(16)
               .fontColor(this.onSurfaceColor)
               .fontWeight(FontWeight.Medium)
-            Text('关闭时，应用切到后台会自动停止画面拉流；开启后将在后台继续播放')
+            Text($r('app.string.settings_bg_playback_desc'))
               .fontSize(12)
               .fontColor(this.onSurfaceVariantColor)
               .margin({ top: 4 })
@@ -549,20 +549,20 @@ export struct SettingsHomeScreen {
         .margin({ top: 10 })
 
         // RTMP
-        Text('RTMP 推流')
+        Text($r('app.string.section_rtmp'))
           .fontSize(16)
           .fontColor(this.onSurfaceVariantColor)
           .fontWeight(FontWeight.Medium)
           .margin({ top: 16, bottom: 10 })
 
         Column() {
-          this.SettingsTextField('服务器地址', 'rtmp://your-server/live', this.rtmpUrlInput, this.onRtmpUrlChange, false)
+          this.SettingsTextField($r('app.string.rtmp_server_addr'), $r('app.string.rtmp_server_hint'), this.rtmpUrlInput, this.onRtmpUrlChange, false)
           Divider().color(this.outlineVariantColor).margin({ left: 16, right: 16 })
-          this.SettingsTextField('推流密钥', '与服务器地址拼接为完整推流路径', this.rtmpStreamKeyInput, this.onRtmpStreamKeyChange, false)
+          this.SettingsTextField($r('app.string.rtmp_stream_key'), $r('app.string.rtmp_stream_key_hint'), this.rtmpStreamKeyInput, this.onRtmpStreamKeyChange, false)
           Divider().color(this.outlineVariantColor).margin({ left: 16, right: 16 })
-          this.SettingsTextField('鉴权用户名', '可留空', this.rtmpUsernameInput, this.onRtmpUsernameChange, false)
+          this.SettingsTextField($r('app.string.rtmp_auth_username'), $r('app.string.field_optional'), this.rtmpUsernameInput, this.onRtmpUsernameChange, false)
           Divider().color(this.outlineVariantColor).margin({ left: 16, right: 16 })
-          this.SettingsTextField('鉴权密码', '可留空', this.rtmpPasswordInput, this.onRtmpPasswordChange, !this.showPassword)
+          this.SettingsTextField($r('app.string.rtmp_auth_password'), $r('app.string.field_optional'), this.rtmpPasswordInput, this.onRtmpPasswordChange, !this.showPassword)
         }
         .width('100%')
         .borderRadius(20)
@@ -571,11 +571,11 @@ export struct SettingsHomeScreen {
         // Audio toggle
         Row() {
           Column() {
-            Text('采集麦克风音频')
+            Text($r('app.string.settings_mic_audio'))
               .fontSize(16)
               .fontColor(this.onSurfaceColor)
               .fontWeight(FontWeight.Medium)
-            Text('推流时同时携带本机音频轨道')
+            Text($r('app.string.settings_mic_audio_desc'))
               .fontSize(12)
               .fontColor(this.onSurfaceVariantColor)
               .margin({ top: 4 })
@@ -594,11 +594,11 @@ export struct SettingsHomeScreen {
         // Auto stream toggle
         Row() {
           Column() {
-            Text('询问RTMP设置')
+            Text($r('app.string.settings_ask_rtmp'))
               .fontSize(16)
               .fontColor(this.onSurfaceColor)
               .fontWeight(FontWeight.Medium)
-            Text('从保存的列表中选择RTMP设置而不是默认设置')
+            Text($r('app.string.settings_ask_rtmp_desc'))
               .fontSize(12)
               .fontColor(this.onSurfaceVariantColor)
               .margin({ top: 4 })
@@ -617,11 +617,11 @@ export struct SettingsHomeScreen {
         // App lock toggle
         Row() {
           Column() {
-            Text('应用锁')
+            Text($r('app.string.settings_app_lock'))
               .fontSize(16)
               .fontColor(this.onSurfaceColor)
               .fontWeight(FontWeight.Medium)
-            Text('使用 PIN 码保护应用，切到后台后需要解锁')
+            Text($r('app.string.settings_app_lock_desc'))
               .fontSize(12)
               .fontColor(this.onSurfaceVariantColor)
               .margin({ top: 4 })
@@ -639,11 +639,11 @@ export struct SettingsHomeScreen {
 
         // RTMP settings manager
         Column() {
-          Text('RTMP设置管理器')
+          Text($r('app.string.rtmp_settings_manager'))
             .fontSize(16)
             .fontColor(this.onSurfaceColor)
             .fontWeight(FontWeight.Medium)
-          Text('管理或重新使用以前的RTMP推流地址和视频密钥')
+          Text($r('app.string.rtmp_settings_manager_desc'))
             .fontSize(14)
             .fontColor(this.onSurfaceVariantColor)
             .margin({ top: 4 })
@@ -656,7 +656,7 @@ export struct SettingsHomeScreen {
         .onClick(() => this.onManageRtmpSettings())
 
         // Clear recordings
-        Text('清理录像')
+        Text($r('app.string.clear_recordings'))
           .fontSize(16)
           .fontColor('#FFFFFF')
           .fontWeight(FontWeight.Bold)
@@ -674,7 +674,7 @@ export struct SettingsHomeScreen {
     }
 
   @Builder
-  SettingsTextField(label: string, hint: string, value: string, onChange: (v: string) => void, password: boolean) {
+  SettingsTextField(label: Resource, hint: Resource, value: string, onChange: (v: string) => void, password: boolean) {
     Column() {
       Text(label)
         .fontSize(13)

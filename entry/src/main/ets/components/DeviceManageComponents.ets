@@ -31,7 +31,7 @@ export struct DeviceManageTopBar {
           .backgroundColor('#33888888')
           .onClick(() => this.onBack())
       } else if (this.flowStep === DeviceFlowStep.Form && this.isEditingExistingCamera) {
-        Text('取消')
+        Text($r('app.string.action_cancel'))
           .fontSize(16)
           .fontColor(this.errorColor)
           .onClick(() => this.onCancel())
@@ -87,7 +87,7 @@ export struct AddCameraLandingScreen {
 
   build(): void {
     Column() {
-        Text('网络搜索')
+        Text($r('app.string.net_search'))
           .fontSize(16)
           .fontColor(this.onSurfaceVariantColor)
           .padding({ top: 26, bottom: 12 })
@@ -103,13 +103,13 @@ export struct AddCameraLandingScreen {
           .width(56)
           .height(56)
 
-          Text('正在搜索网络...')
+          Text($r('app.string.searching_network'))
             .fontSize(22)
             .fontColor(this.onSurfaceColor)
             .fontWeight(FontWeight.Bold)
             .margin({ top: 14 })
 
-          Text('搜索并自动连接网络上的摄像头。没有看到您要找的东西？进行深度扫描')
+          Text($r('app.string.search_network_desc'))
             .fontSize(14)
             .fontColor(this.onSurfaceVariantColor)
             .textAlign(TextAlign.Center)
@@ -133,12 +133,12 @@ export struct AddCameraLandingScreen {
             }
             .width(54)
             .height(54)
-            Text('添加本地摄像机')
+            Text($r('app.string.add_local_camera'))
               .fontSize(22)
               .fontColor(this.onSurfaceColor)
               .fontWeight(FontWeight.Bold)
               .margin({ top: 14 })
-            Text('通过 IP 地址或域名添加本地网络摄像机')
+            Text($r('app.string.add_local_camera_desc'))
               .fontSize(16)
               .fontColor(this.onSurfaceVariantColor)
               .textAlign(TextAlign.Center)
@@ -218,7 +218,7 @@ export struct AddCameraFormScreen {
     Column() {
       Scroll() {
         Column() {
-          Text('手动连接')
+          Text($r('app.string.manual_connect'))
             .fontSize(32)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.onSurfaceColor)
@@ -226,7 +226,7 @@ export struct AddCameraFormScreen {
             .margin({ top: 6, bottom: 22 })
 
           // 手动连接 section
-          Text('手动连接')
+          Text($r('app.string.manual_connect'))
             .fontSize(15)
             .fontColor(this.onSurfaceVariantColor)
             .width('100%')
@@ -234,11 +234,11 @@ export struct AddCameraFormScreen {
 
           Column() {
             Row() {
-              Text('主机 / IP')
+              Text($r('app.string.host_ip'))
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
                 .width(96)
-              TextInput({ text: this.manageHost, placeholder: '主机' })
+              TextInput({ text: this.manageHost, placeholder: $r('app.string.host_placeholder') })
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
                 .textAlign(TextAlign.End)
@@ -258,14 +258,14 @@ export struct AddCameraFormScreen {
           .backgroundColor(this.surfaceColor)
           .padding({ left: 18, right: 18 })
 
-          Text('输入摄像机的 IP 地址或主机名。')
+          Text($r('app.string.host_hint'))
             .fontSize(13)
             .fontColor(this.onSurfaceVariantColor)
             .width('100%')
             .margin({ top: 8 })
 
           // 登录 section
-          Text('登录')
+          Text($r('app.string.section_login'))
             .fontSize(15)
             .fontColor(this.onSurfaceVariantColor)
             .width('100%')
@@ -273,7 +273,7 @@ export struct AddCameraFormScreen {
 
           Column() {
             Row() {
-              Text('用户名')
+              Text($r('app.string.username'))
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
                 .width(96)
@@ -291,12 +291,12 @@ export struct AddCameraFormScreen {
             Divider().color(this.outlineVariantColor)
 
             Row() {
-              Text('密码')
+              Text($r('app.string.password'))
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
                 .width(96)
               if (this.managePasswordVisible) {
-                TextInput({ text: this.managePassword, placeholder: '密码' })
+                TextInput({ text: this.managePassword, placeholder: $r('app.string.password') })
                   .fontSize(16)
                   .fontColor(this.onSurfaceColor)
                   .textAlign(TextAlign.End)
@@ -304,7 +304,7 @@ export struct AddCameraFormScreen {
                   .layoutWeight(1)
                   .onChange((v: string) => this.onManagePasswordChange(v))
               } else {
-                TextInput({ text: this.managePassword, placeholder: '密码' })
+                TextInput({ text: this.managePassword, placeholder: $r('app.string.password') })
                   .fontSize(16)
                   .fontColor(this.onSurfaceColor)
                   .textAlign(TextAlign.End)
@@ -327,14 +327,14 @@ export struct AddCameraFormScreen {
           .backgroundColor(this.surfaceColor)
           .padding({ left: 18, right: 18 })
 
-          Text('如果是匿名认证，请留空')
+          Text($r('app.string.anonymous_hint'))
             .fontSize(13)
             .fontColor(this.onSurfaceVariantColor)
             .width('100%')
             .margin({ top: 8 })
 
           // 高级 section
-          Text('高级')
+          Text($r('app.string.section_advanced'))
             .fontSize(15)
             .fontColor(this.onSurfaceVariantColor)
             .width('100%')
@@ -342,11 +342,11 @@ export struct AddCameraFormScreen {
 
           Column() {
             Row() {
-              Text('品牌')
+              Text($r('app.string.brand'))
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
                 .layoutWeight(1)
-              Text(this.manageVendor.trim() !== '' ? this.manageVendor : '自动检测（ONVIF）')
+              Text(this.manageVendor.trim() !== '' ? this.manageVendor : getContext(this).resourceManager.getStringByNameSync('auto_detect_onvif'))
                 .fontSize(16)
                 .fontColor(this.onSurfaceVariantColor)
               Text('›')
@@ -361,7 +361,7 @@ export struct AddCameraFormScreen {
             Divider().color(this.outlineVariantColor)
 
             Row() {
-              Text('高级设置')
+              Text($r('app.string.advanced_settings'))
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
                 .layoutWeight(1)
@@ -377,7 +377,7 @@ export struct AddCameraFormScreen {
               Divider().color(this.outlineVariantColor)
 
               Row() {
-                Text('方案')
+                Text($r('app.string.scheme'))
                   .fontSize(16)
                   .fontColor(this.onSurfaceColor)
                   .width(96)
@@ -412,7 +412,7 @@ export struct AddCameraFormScreen {
               Divider().color(this.outlineVariantColor)
 
               Row() {
-                Text('端口')
+                Text($r('app.string.port'))
                   .fontSize(16)
                   .fontColor(this.onSurfaceColor)
                   .width(96)
@@ -431,7 +431,7 @@ export struct AddCameraFormScreen {
               Divider().color(this.outlineVariantColor)
 
               Row() {
-                Text('路径')
+                Text($r('app.string.path'))
                   .fontSize(16)
                   .fontColor(this.onSurfaceColor)
                   .width(96)
@@ -449,7 +449,7 @@ export struct AddCameraFormScreen {
               Divider().color(this.outlineVariantColor)
 
               Row() {
-                Text('登录已启用')
+                Text($r('app.string.login_enabled'))
                   .fontSize(16)
                   .fontColor(this.onSurfaceColor)
                   .layoutWeight(1)
@@ -463,7 +463,7 @@ export struct AddCameraFormScreen {
                 Divider().color(this.outlineVariantColor)
 
                 Row() {
-                  Text('强制软件解码')
+                  Text($r('app.string.force_software_decode'))
                     .fontSize(16)
                     .fontColor(this.onSurfaceColor)
                     .layoutWeight(1)
@@ -481,7 +481,7 @@ export struct AddCameraFormScreen {
           .padding({ left: 18, right: 18 })
 
           if (this.showAdvanced) {
-            Text(`IPCams 将连接在 ${sanitizePlaybackUrl(this.getPreviewUrl())}`)
+            Text($r('app.string.ipcams_connect_hint', sanitizePlaybackUrl(this.getPreviewUrl())))
               .fontSize(13)
               .fontColor(this.onSurfaceVariantColor)
               .width('100%')
@@ -494,7 +494,7 @@ export struct AddCameraFormScreen {
       .scrollBar(BarState.Off)
       .layoutWeight(1)
 
-      Text('继续')
+      Text($r('app.string.action_continue'))
         .fontSize(18)
         .fontColor(this.onPrimaryColor)
         .fontWeight(FontWeight.Bold)
@@ -546,7 +546,7 @@ export struct AddCameraVerificationScreen {
     Column() {
       Scroll() {
         Column() {
-          Text('添加相机')
+          Text($r('app.string.add_camera_title'))
             .fontSize(32)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.onSurfaceColor)
@@ -554,14 +554,14 @@ export struct AddCameraVerificationScreen {
             .margin({ top: 6, bottom: 22 })
 
           // 连接 section
-          Text('连接')
+          Text($r('app.string.section_connection'))
             .fontSize(15)
             .fontColor(this.onSurfaceVariantColor)
             .width('100%')
             .margin({ bottom: 10 })
 
           Row() {
-            Text(this.isConnecting ? '正在连接...' : '已连接')
+            Text(this.isConnecting ? $r('app.string.connecting') : $r('app.string.connected'))
               .fontSize(16)
               .fontColor(this.onSurfaceColor)
               .layoutWeight(1)
@@ -582,14 +582,14 @@ export struct AddCameraVerificationScreen {
           .padding({ left: 18, right: 18, top: 16, bottom: 16 })
 
           // 主码流 section
-          Text('主码流')
+          Text($r('app.string.main_stream'))
             .fontSize(15)
             .fontColor(this.onSurfaceVariantColor)
             .width('100%')
             .margin({ top: 24, bottom: 10 })
 
           Row() {
-            Text('主码流')
+            Text($r('app.string.main_stream'))
               .fontSize(16)
               .fontColor(this.onSurfaceColor)
               .layoutWeight(1)
@@ -603,7 +603,7 @@ export struct AddCameraVerificationScreen {
           .padding({ left: 18, right: 18, top: 16, bottom: 16 })
 
           // 相机信息 section
-          Text('相机信息')
+          Text($r('app.string.camera_info'))
             .fontSize(15)
             .fontColor(this.onSurfaceVariantColor)
             .width('100%')
@@ -611,11 +611,11 @@ export struct AddCameraVerificationScreen {
 
           Column() {
             Row() {
-              Text('命名')
+              Text($r('app.string.camera_name'))
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
                 .width(96)
-              TextInput({ text: this.manageName, placeholder: '命名' })
+              TextInput({ text: this.manageName, placeholder: $r('app.string.camera_name') })
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
                 .textAlign(TextAlign.End)
@@ -630,7 +630,7 @@ export struct AddCameraVerificationScreen {
 
             Row() {
               Column() {
-                Text('图标')
+                Text($r('app.string.icon'))
                   .fontSize(16)
                   .fontColor(this.onSurfaceVariantColor)
                 Text('IPCams')
@@ -656,13 +656,13 @@ export struct AddCameraVerificationScreen {
           .backgroundColor(this.surfaceColor)
           .padding({ left: 18, right: 18 })
 
-          Text('用名字和图标来个性化你的相机。')
+          Text($r('app.string.camera_personalize'))
             .fontSize(13)
             .fontColor(this.onSurfaceVariantColor)
             .width('100%')
             .margin({ top: 8 })
 
-          Text(`URL： ${sanitizePlaybackUrl(this.result?.primaryUrl ?? '')}`)
+          Text($r('app.string.url_label', sanitizePlaybackUrl(this.result?.primaryUrl ?? '')))
             .fontSize(13)
             .fontColor(this.onSurfaceVariantColor)
             .width('100%')
@@ -674,7 +674,7 @@ export struct AddCameraVerificationScreen {
       .scrollBar(BarState.Off)
       .layoutWeight(1)
 
-      Text('添加相机')
+      Text($r('app.string.add_camera_title'))
         .fontSize(18)
         .fontColor(this.onPrimaryColor)
         .fontWeight(FontWeight.Bold)
@@ -779,7 +779,7 @@ export struct ManufacturerPickerScreen {
           .fontSize(18)
           .fontColor(this.onSurfaceVariantColor)
           .margin({ right: 6 })
-        TextInput({ text: this.searchQuery, placeholder: '搜索制造商' })
+        TextInput({ text: this.searchQuery, placeholder: $r('app.string.search_manufacturer') })
           .fontSize(16)
           .fontColor(this.onSurfaceColor)
           .backgroundColor(Color.Transparent)
@@ -796,7 +796,7 @@ export struct ManufacturerPickerScreen {
         Column() {
           Column() {
             Row() {
-              Text('自动检测（ONVIF）')
+              Text($r('app.string.auto_detect_onvif'))
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
                 .layoutWeight(1)
@@ -817,17 +817,17 @@ export struct ManufacturerPickerScreen {
           .margin({ top: 24 })
 
           if (this.filterBrands(HOT_MANUFACTURERS).length > 0) {
-            this.BrandSection('热门品牌', this.filterBrands(HOT_MANUFACTURERS))
+            this.BrandSection(getContext(this).resourceManager.getStringByNameSync('popular_brands'), this.filterBrands(HOT_MANUFACTURERS))
           }
 
           if (this.filterBrands(ALL_MANUFACTURERS).length > 0) {
-            this.BrandSection('所有品牌', this.filterBrands(ALL_MANUFACTURERS))
+            this.BrandSection(getContext(this).resourceManager.getStringByNameSync('all_brands'), this.filterBrands(ALL_MANUFACTURERS))
           }
 
           if (this.searchQuery.trim() !== ''
             && this.filterBrands(HOT_MANUFACTURERS).length === 0
             && this.filterBrands(ALL_MANUFACTURERS).length === 0) {
-            Text('未找到匹配的制造商')
+            Text($r('app.string.no_manufacturer_found'))
               .fontSize(15)
               .fontColor(this.onSurfaceVariantColor)
               .width('100%')

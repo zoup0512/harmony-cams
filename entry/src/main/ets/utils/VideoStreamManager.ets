@@ -2,6 +2,7 @@ import { media } from '@kit.MediaKit';
 import { image } from '@kit.ImageKit';
 import { common } from '@kit.AbilityKit';
 import { CameraDevice } from '../model/CameraDevice';
+import { rstr } from './I18nUtils';
 import { WlPlayer, WlComponentController, WlCompleteType, WlLoadStatus, WlCodecType, WlAudioInterruptType, WlAudioInterruptHint, WlTrackType } from '@ywl5320/libwlmedia';
 
 export enum PlaybackRenderMode {
@@ -13,7 +14,7 @@ export class VideoStreamManager {
   private static instance: VideoStreamManager | null = null;
   private context: common.Context;
   private currentPlayer: media.AVPlayer | null = null;
-  private lastDiagnosticMessage: string = '未开始播放';
+  private lastDiagnosticMessage: string = '';
   private isShuttingDown: boolean = false;
   private hasVideoOutput: boolean = false;
   private surfaceId: string | null = null;
@@ -64,14 +65,14 @@ export class VideoStreamManager {
     const streamUrl = camera.rtspUrl;
     const streamType = streamUrl.split('://')[0] ?? 'unknown';
     console.info(`VideoStreamManager startStream BEGIN: cameraId=${camera.id}, name=${camera.name}, url=${streamUrl}, streamType=${streamType}, surfaceId=${this.surfaceId}, isShuttingDown=${this.isShuttingDown}`);
-    this.lastDiagnosticMessage = `开始连接: ${streamUrl}`;
+    this.lastDiagnosticMessage = rstr(this.context, 'diag_connecting', streamUrl);
     if (streamUrl === '') {
-      this.lastDiagnosticMessage = 'RTSP URL 为空';
+      this.lastDiagnosticMessage = rstr(this.context, 'diag_url_empty');
       console.error(`VideoStreamManager startStream: URL is empty, aborting`);
       return null;
     }
     if (this.isShuttingDown) {
-      this.lastDiagnosticMessage = '播放器正在关闭';
+      this.lastDiagnosticMessage = rstr(this.context, 'diag_shutting_down');
       console.error(`VideoStreamManager startStream: manager is shutting down, aborting`);
       return null;
     }
@@ -108,10 +109,10 @@ export class VideoStreamManager {
         console.info(`VideoStreamManager stateChange: state=${state}, reason=${reason}, elapsedMs=${elapsed}, url=${streamUrl}`);
         switch (state) {
           case 'idle':
-            this.lastDiagnosticMessage = '空闲';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_idle');
             break;
           case 'initialized':
-            this.lastDiagnosticMessage = '已初始化';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_initialized');
             console.info(`VideoStreamManager stateChange=initialized: player.url=${player.url}, state=${player.state}`);
             if (this.surfaceId) {
               console.info(`VideoStreamManager: setting surfaceId=${this.surfaceId} in initialized state`);
@@ -122,39 +123,39 @@ export class VideoStreamManager {
             if (onInitialized) { onInitialized(); }
             break;
           case 'preparing':
-            this.lastDiagnosticMessage = '正在准备...';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_preparing');
             break;
           case 'prepared':
-            this.lastDiagnosticMessage = '已准备就绪';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_prepared');
             preparedAt = Date.now();
             console.info(`VideoStreamManager stateChange=prepared: prepareCostMs=${preparedAt - startTime}, duration=${player.duration}, state=${player.state}`);
             if (onPrepared) { onPrepared(); }
             break;
           case 'playing':
-            this.lastDiagnosticMessage = '流已开始播放';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_playing');
             camera.isConnected = true;
             this.hasVideoOutput = true;
             playingAt = Date.now();
             console.info(`VideoStreamManager stateChange=playing: playCostMs=${playingAt - startTime}, prepareToPlayMs=${playingAt - preparedAt}, state=${player.state}`);
             break;
           case 'paused':
-            this.lastDiagnosticMessage = '已暂停';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_paused');
             break;
           case 'completed':
-            this.lastDiagnosticMessage = '流已结束';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_completed');
             camera.isConnected = false;
             console.info(`VideoStreamManager stateChange=completed: stream ended, elapsedMs=${Date.now() - startTime}`);
             break;
           case 'stopped':
-            this.lastDiagnosticMessage = '已停止';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_stopped');
             camera.isConnected = false;
             break;
           case 'released':
-            this.lastDiagnosticMessage = '已释放';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_released');
             camera.isConnected = false;
             break;
           case 'error':
-            this.lastDiagnosticMessage = '播放报错(可能URL/账号密码/编码不兼容)';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_error');
             camera.isConnected = false;
             console.error(`VideoStreamManager stateChange=error: reason=${reason}, elapsedMs=${Date.now() - startTime}, url=${streamUrl}`);
             if (onError) { onError(`stateChange error: reason=${reason}`); }
@@ -168,7 +169,7 @@ export class VideoStreamManager {
       player.on('error', (err) => {
         const errJson = JSON.stringify(err);
         console.error(`VideoStreamManager onError: err=${errJson}, url=${streamUrl}, playerState=${player.state}`);
-        this.lastDiagnosticMessage = `播放错误: ${err.message ?? 'unknown'}`;
+        this.lastDiagnosticMessage = rstr(this.context, 'diag_playback_error', err.message ?? 'unknown');
         camera.isConnected = false;
         if (onError) { onError(err.message ?? 'unknown error'); }
       });
@@ -231,14 +232,14 @@ export class VideoStreamManager {
       const playCost = Date.now() - playStart;
       console.info(`VideoStreamManager startStream: play() done, costMs=${playCost}, state=${player.state}`);
 
-      this.lastDiagnosticMessage = '已发起播放';
+      this.lastDiagnosticMessage = rstr(this.context, 'diag_play_initiated');
       console.info(`VideoStreamManager startStream END: success, totalCostMs=${Date.now() - startTime}, streamType=${streamType}`);
       return player;
     } catch (e) {
       const errMsg = (e as Error).message;
       const errStack = (e as Error).stack;
       console.error(`VideoStreamManager startStream EXCEPTION: msg=${errMsg}, stack=${errStack}, url=${streamUrl}, streamType=${streamType}`);
-      this.lastDiagnosticMessage = `启动异常: ${errMsg}`;
+      this.lastDiagnosticMessage = rstr(this.context, 'diag_startup_exception', errMsg);
       return null;
     }
   }
@@ -259,7 +260,7 @@ export class VideoStreamManager {
       this.hasVideoOutput = false;
       this.videoWidth = 0;
       this.videoHeight = 0;
-      this.lastDiagnosticMessage = '已手动停止';
+      this.lastDiagnosticMessage = rstr(this.context, 'diag_manual_stop');
       return;
     }
     const player = this.currentPlayer;
@@ -274,7 +275,7 @@ export class VideoStreamManager {
     this.hasVideoOutput = false;
     this.videoWidth = 0;
     this.videoHeight = 0;
-    this.lastDiagnosticMessage = '已手动停止';
+    this.lastDiagnosticMessage = rstr(this.context, 'diag_manual_stop');
   }
 
   async play(): Promise<void> {
@@ -377,7 +378,7 @@ export class VideoStreamManager {
     console.info(`VideoStreamManager startStreamWlPlayer BEGIN: url=${streamUrl}, surfaceId=${this.surfaceId}`);
 
     if (!this.surfaceId) {
-      this.lastDiagnosticMessage = 'SurfaceId 未就绪，无法播放 RTSP';
+      this.lastDiagnosticMessage = rstr(this.context, 'diag_surface_not_ready');
       console.error(`VideoStreamManager startStreamWlPlayer: surfaceId is null`);
       return null;
     }
@@ -401,7 +402,7 @@ export class VideoStreamManager {
       player.setOnMediaInfoListener({
         onPrepared: (): void => {
           console.info(`VideoStreamManager WlPlayer onPrepared`);
-          this.lastDiagnosticMessage = 'RTSP流已准备就绪';
+          this.lastDiagnosticMessage = rstr(this.context, 'diag_rtsp_prepared');
           if (onPrepared) { onPrepared(); }
         },
         onTimeInfo: (currentTime: number, bufferTime: number): void => {
@@ -409,26 +410,26 @@ export class VideoStreamManager {
         onComplete: (wlCompleteType: WlCompleteType, msg: string): void => {
           console.info(`VideoStreamManager WlPlayer onComplete: type=${wlCompleteType}, msg=${msg}`);
           if (wlCompleteType === WlCompleteType.WL_COMPLETE_ERROR) {
-            this.lastDiagnosticMessage = `RTSP播放错误: ${msg}`;
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_rtsp_playback_error', msg);
             this.wlPlayerPlaying = false;
             camera.isConnected = false;
             if (onError) { onError(msg); }
           } else if (wlCompleteType === WlCompleteType.WL_COMPLETE_HANDLE) {
-            this.lastDiagnosticMessage = 'RTSP流已停止';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_rtsp_stopped');
             this.wlPlayerPlaying = false;
             camera.isConnected = false;
           } else if (wlCompleteType === WlCompleteType.WL_COMPLETE_TIMEOUT) {
-            this.lastDiagnosticMessage = 'RTSP连接超时';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_rtsp_timeout');
             this.wlPlayerPlaying = false;
             camera.isConnected = false;
-            if (onError) { onError('RTSP连接超时'); }
+            if (onError) { onError(rstr(this.context, 'diag_rtsp_timeout')); }
           }
         },
         onLoadInfo: (wlLoadStatus: WlLoadStatus, progress: number, speed: number): void => {
           if (wlLoadStatus === WlLoadStatus.WL_LOADING_STATUS_START) {
-            this.lastDiagnosticMessage = '正在加载RTSP流...';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_rtsp_loading');
           } else if (wlLoadStatus === WlLoadStatus.WL_LOADING_STATUS_FINISH) {
-            this.lastDiagnosticMessage = 'RTSP流加载完成';
+            this.lastDiagnosticMessage = rstr(this.context, 'diag_rtsp_load_complete');
           }
         },
         onFirstFrameRendered: (): void => {
@@ -436,7 +437,7 @@ export class VideoStreamManager {
           this.hasVideoOutput = true;
           this.wlPlayerPlaying = true;
           camera.isConnected = true;
-          this.lastDiagnosticMessage = 'RTSP流已开始播放';
+          this.lastDiagnosticMessage = rstr(this.context, 'diag_rtsp_playing');
           if (onFirstFrame) { onFirstFrame(); }
         },
         onSeekFinish: (): void => {
@@ -501,7 +502,7 @@ export class VideoStreamManager {
     } catch (e) {
       const errMsg = (e as Error).message;
       console.error(`VideoStreamManager startStreamWlPlayer EXCEPTION: msg=${errMsg}, url=${streamUrl}`);
-      this.lastDiagnosticMessage = `RTSP启动异常: ${errMsg}`;
+      this.lastDiagnosticMessage = rstr(this.context, 'diag_rtsp_startup_exception', errMsg);
       this.usingWlPlayer = false;
       this.wlPlayerPlaying = false;
       try { this.wlPlayer?.release(); } catch (e) { console.error(`VideoStreamManager startStreamWlPlayer: release failed: ${(e as Error).message}`); }

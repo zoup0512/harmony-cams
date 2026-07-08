@@ -1,6 +1,8 @@
 import { socket, connection } from '@kit.NetworkKit';
+import { common } from '@kit.AbilityKit';
 import { PlaybackStreamType, parsePlaybackUrl, playbackStreamTypeFromUrl, defaultPlaybackPort } from './PlaybackModels';
 import { CameraDevice } from '../model/CameraDevice';
+import { rstr, rstrNum } from './I18nUtils';
 
 const TAG = 'CameraHealthChecker';
 const DEFAULT_TIMEOUT_MS = 3000;
@@ -12,22 +14,22 @@ export interface HealthCheckResult {
   error?: string;
 }
 
-export async function checkCameraReachable(camera: CameraDevice, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<HealthCheckResult> {
+export async function checkCameraReachable(camera: CameraDevice, timeoutMs: number = DEFAULT_TIMEOUT_MS, context?: common.Context): Promise<HealthCheckResult> {
   if (!camera.rtspUrl || camera.rtspUrl.trim() === '') {
-    return { reachable: false, latencyMs: 0, error: 'URL为空' };
+    return { reachable: false, latencyMs: 0, error: context ? rstr(context, 'health_url_empty') : 'URL is empty' };
   }
 
   const parsed = parsePlaybackUrl(camera.rtspUrl);
   const host = parsed.host;
   if (!host) {
-    return { reachable: false, latencyMs: 0, error: '无法解析主机地址' };
+    return { reachable: false, latencyMs: 0, error: context ? rstr(context, 'health_host_unresolved') : 'Cannot resolve host' };
   }
 
   const streamType = playbackStreamTypeFromUrl(camera.rtspUrl);
   const portStr = parsed.port || defaultPlaybackPort(streamType) || String(DEFAULT_PORT);
   const port = parseInt(portStr, 10);
   if (!port || port <= 0 || port > 65535) {
-    return { reachable: false, latencyMs: 0, error: `端口无效: ${portStr}` };
+    return { reachable: false, latencyMs: 0, error: context ? rstr(context, 'health_port_invalid', portStr) : `Invalid port: ${portStr}` };
   }
 
   let resolvedIp = host;
@@ -37,10 +39,10 @@ export async function checkCameraReachable(camera: CameraDevice, timeoutMs: numb
       if (addresses && addresses.length > 0) {
         resolvedIp = addresses[0].address;
       } else {
-        return { reachable: false, latencyMs: 0, error: `DNS解析失败: ${host}` };
+        return { reachable: false, latencyMs: 0, error: context ? rstr(context, 'health_dns_failed', host) : `DNS resolution failed: ${host}` };
       }
     } catch (e) {
-      return { reachable: false, latencyMs: 0, error: `DNS解析异常: ${(e as Error).message}` };
+      return { reachable: false, latencyMs: 0, error: context ? rstr(context, 'health_dns_error', (e as Error).message) : `DNS resolution error: ${(e as Error).message}` };
     }
   }
 
@@ -60,7 +62,7 @@ export async function checkCameraReachable(camera: CameraDevice, timeoutMs: numb
 
     const timeoutPromise = new Promise<void>((_, reject) => {
       timerId = setTimeout(() => {
-        reject(new Error(`连接超时 (${timeoutMs}ms)`));
+        reject(new Error(context ? rstrNum(context, 'health_timeout', timeoutMs) : `Connection timeout (${timeoutMs}ms)`));
       }, timeoutMs + 500);
     });
 
@@ -89,7 +91,7 @@ export async function checkCameraReachable(camera: CameraDevice, timeoutMs: numb
       const latency = Date.now() - startTime;
       return { reachable: true, latencyMs: latency };
     } else {
-      return { reachable: false, latencyMs: Date.now() - startTime, error: '连接未建立' };
+      return { reachable: false, latencyMs: Date.now() - startTime, error: context ? rstr(context, 'health_not_connected') : 'Connection not established' };
     }
   } finally {
     try {
@@ -104,7 +106,7 @@ export async function checkCameraReachable(camera: CameraDevice, timeoutMs: numb
   }
 }
 
-export async function checkCamerasHealth(cameras: CameraDevice[], timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<Map<string, HealthCheckResult>> {
+export async function checkCamerasHealth(cameras: CameraDevice[], timeoutMs: number = DEFAULT_TIMEOUT_MS, context?: common.Context): Promise<Map<string, HealthCheckResult>> {
   const results = new Map<string, HealthCheckResult>();
   const concurrency = 5;
   const batches: CameraDevice[][] = [];
@@ -114,7 +116,7 @@ export async function checkCamerasHealth(cameras: CameraDevice[], timeoutMs: num
 
   for (const batch of batches) {
     const promises = batch.map(async (camera) => {
-      const result = await checkCameraReachable(camera, timeoutMs);
+      const result = await checkCameraReachable(camera, timeoutMs, context);
       results.set(camera.id, result);
       return result;
     });

@@ -31,7 +31,7 @@ export struct RecordingPreviewDialog {
           .margin({ top: 16 })
       }
 
-      Text('关闭')
+      Text($r('app.string.dialog_close'))
         .fontSize(16)
         .fontColor(this.accentColor)
         .fontWeight(FontWeight.Medium)
@@ -60,7 +60,7 @@ export struct DeleteSnapshotConfirmDialog {
 
   build(): void {
     Column() {
-      Text('删除快照')
+      Text($r('app.string.dialog_delete_snapshot_title'))
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
         .fontColor('#1B1B1D')
@@ -72,7 +72,7 @@ export struct DeleteSnapshotConfirmDialog {
         .padding({ left: 24, right: 24, top: 8 })
 
       Row() {
-        Text('取消')
+        Text($r('app.string.dialog_cancel'))
           .fontSize(16)
           .fontColor('#6B6F76')
           .layoutWeight(1)
@@ -80,7 +80,7 @@ export struct DeleteSnapshotConfirmDialog {
           .padding({ top: 16, bottom: 16 })
           .onClick(() => this.onDismiss())
 
-        Text('删除')
+        Text($r('app.string.dialog_delete'))
           .fontSize(16)
           .fontColor(this.errorColor)
           .fontWeight(FontWeight.Bold)

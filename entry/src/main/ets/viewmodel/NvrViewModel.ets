@@ -3,6 +3,7 @@ import { promptAction } from '@kit.ArkUI';
 import { image } from '@kit.ImageKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { CameraDevice, createCameraDevice } from '../model/CameraDevice';
+import { rstr, rstrNum } from '../utils/I18nUtils';
 import { RecordingFile, createRecordingFile } from '../model/RecordingFile';
 import { DatabaseHelper } from '../utils/DatabaseHelper';
 import { StorageManager } from '../utils/StorageManager';
@@ -206,7 +207,7 @@ export class NvrViewModel {
           continue;
         }
         try {
-          const result = await checkCameraReachable(camera, this.healthCheckTimeoutMs);
+          const result = await checkCameraReachable(camera, this.healthCheckTimeoutMs, this.context);
           if (result.reachable) {
             camera.isConnected = true;
             camera.lastSeen = Date.now();
@@ -376,7 +377,7 @@ export class NvrViewModel {
   }
 
   async playAdHocUrl(title: string, url: string): Promise<void> {
-    const friendlyName = title || '临时播放';
+    const friendlyName = title || rstr(this.context, 'toast_ad_hoc_name');
     const safeId = `adhoc_${generateUUID()}`;
     const adhoc = createCameraDevice(safeId, friendlyName, url);
     await this.clearPlaybackState();
@@ -400,7 +401,7 @@ export class NvrViewModel {
     if (!player) {
       const diagnosis = this.streamManager.getLastDiagnosticMessage();
       console.error(`NvrViewModel startPlayback: startStream returned null, diagnosis=${diagnosis}, url=${cameraToPlay.rtspUrl}`);
-      safeShowToast(`拉流失败：${diagnosis}`);
+      safeShowToast(rstr(this.context, 'toast_stream_failed', diagnosis));
       return;
     }
 
@@ -408,18 +409,18 @@ export class NvrViewModel {
     this.uiState.playback.playingCameraId = cameraToPlay.id;
     this.uiState.playback.lastRequestedPlaybackCameraId = cameraToPlay.id;
     this.streamManager.setVolume(this.uiState.playback.lastNonZeroVolume);
-    safeShowToast('开始播放');
+    safeShowToast(rstr(this.context, 'toast_playback_started'));
   }
 
   async saveSnapshot(cameraId: string, cameraName: string): Promise<boolean> {
     console.info(`NvrViewModel saveSnapshot: BEGIN cameraId='${cameraId}', name='${cameraName}'`);
     if (!cameraId) {
-      safeShowToast('无法截取快照：缺少相机信息');
+      safeShowToast(rstr(this.context, 'toast_no_camera_info'));
       return false;
     }
     const pixelMap = await this.streamManager.captureSurfaceFrame();
     if (!pixelMap) {
-      safeShowToast('快照功能需要视频画面就绪');
+      safeShowToast(rstr(this.context, 'toast_snapshot_need_video'));
       return false;
     }
     try {
@@ -442,13 +443,13 @@ export class NvrViewModel {
       pixelMap.release();
       await fileIo.close(file);
       console.info(`NvrViewModel saveSnapshot: DONE, path='${snapshotPath}'`);
-      safeShowToast('快照已保存');
+      safeShowToast(rstr(this.context, 'toast_snapshot_saved'));
       await this.reloadSnapshots();
       return true;
     } catch (e) {
       console.error(`NvrViewModel saveSnapshot FAILED: ${(e as Error).message}, stack=${(e as Error).stack}`);
       try { pixelMap.release(); } catch { /* ignore */ }
-      safeShowToast('快照保存失败');
+      safeShowToast(rstr(this.context, 'toast_snapshot_save_failed'));
       return false;
     }
   }
@@ -456,15 +457,15 @@ export class NvrViewModel {
   /* Recording */
   async toggleRecording(): Promise<void> {
     if (!this.uiState.playback.playingCameraId) {
-      safeShowToast('当前没有可控制的播放');
+      safeShowToast(rstr(this.context, 'toast_no_playback'));
       return;
     }
     if (this.uiState.playback.isRecording) {
       this.uiState.playback.isRecording = false;
-      safeShowToast('停止录制');
+      safeShowToast(rstr(this.context, 'toast_stop_recording'));
     } else {
       this.uiState.playback.isRecording = true;
-      safeShowToast('开始录制');
+      safeShowToast(rstr(this.context, 'toast_start_recording'));
     }
   }
 
@@ -505,7 +506,7 @@ export class NvrViewModel {
   async duplicateCamera(device: CameraDevice): Promise<void> {
     const copied = createCameraDevice(
       generateUUID(),
-      `${device.name} 副本`,
+      `${device.name} ${rstr(this.context, 'camera_copy_suffix')}`,
       device.rtspUrl,
       device.isRecording,
       device.isConnected,
@@ -528,7 +529,7 @@ export class NvrViewModel {
       this.uiState.selectedCameraIndex = idx;
       }
     }
-    safeShowToast(ok ? '已复制相机' : '复制失败');
+    safeShowToast(ok ? rstr(this.context, 'toast_camera_copied') : rstr(this.context, 'toast_copy_failed'));
   }
 
   async deleteCamera(device: CameraDevice): Promise<void> {
@@ -548,7 +549,7 @@ export class NvrViewModel {
       }
       await this.reloadCameras();
     }
-    safeShowToast(ok ? '删除相机成功' : '删除相机失败');
+    safeShowToast(ok ? rstr(this.context, 'toast_camera_deleted') : rstr(this.context, 'toast_camera_delete_failed'));
     const next = this.cameras.find(c => c.id !== device.id);
     await this.loadSelectedDeviceToForm(next ?? null);
   }
@@ -730,8 +731,8 @@ export class NvrViewModel {
       this.uiState.deviceForm.deviceFlowStep = DeviceFlowStep.Landing;
       this.uiState.deviceForm.verificationResult = null;
     }
-    safeShowToast(success ? '保存成功'
-      : (editingDeviceId ? '更新失败' : '保存失败'));
+    safeShowToast(success ? rstr(this.context, 'toast_save_success')
+      : (editingDeviceId ? rstr(this.context, 'toast_update_failed') : rstr(this.context, 'toast_save_failed')));
     return success;
   }
 
@@ -745,11 +746,11 @@ export class NvrViewModel {
     const selectedScheme = playbackStreamTypeFromScheme(d.manageStreamScheme) ?? PlaybackStreamType.RTSP;
 
     if (host === '') {
-      safeShowToast('请填写主机/IP');
+      safeShowToast(rstr(this.context, 'toast_fill_host'));
       return;
     }
     if (port !== '' && !/^\d+$/.test(port)) {
-      safeShowToast('端口格式不正确');
+      safeShowToast(rstr(this.context, 'toast_port_invalid'));
       return;
     }
 
@@ -779,7 +780,7 @@ export class NvrViewModel {
     for (const file of allFiles) {
       if (this.storageManager.deleteFile(file.filePath)) deleted++;
     }
-    safeShowToast(`已清理 ${deleted} / ${allFiles.length} 个文件`);
+    safeShowToast(rstrNum(this.context, 'toast_recordings_cleared', deleted, allFiles.length));
     await this.reloadRecordings();
   }
 
@@ -824,7 +825,7 @@ export class NvrViewModel {
       };
       context.startAbility(want);
     } catch (e) {
-      safeShowToast('分享失败');
+      safeShowToast(rstr(this.context, 'toast_share_failed'));
     }
   }
 }

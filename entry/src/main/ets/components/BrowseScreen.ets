@@ -83,7 +83,7 @@ export struct BrowseScreen {
         .padding({ left: 16, right: 16, top: 12, bottom: 12 })
 
         // Favorites section
-        Text('收藏')
+        Text($r('app.string.section_favorites'))
           .fontSize(16)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.accentColor)
@@ -91,7 +91,7 @@ export struct BrowseScreen {
           .padding({ left: 16, top: 12, bottom: 12 })
 
         if (this.favorites.length === 0) {
-          Text('暂无收藏')
+          Text($r('app.string.no_favorites'))
             .fontSize(14)
             .fontColor(this.onSurfaceVariantColor)
             .width('100%')
@@ -109,7 +109,7 @@ export struct BrowseScreen {
                   .fontColor(this.onSurfaceColor)
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
-                Text(fav.source === BrowseSourceKind.LOCAL_FILE ? '本地文件' : '网络源')
+                Text(fav.source === BrowseSourceKind.LOCAL_FILE ? $r('app.string.local_file') : $r('app.string.network_source'))
                   .fontSize(12)
                   .fontColor(this.onSurfaceVariantColor)
                   .margin({ top: 4 })
@@ -131,14 +131,14 @@ export struct BrowseScreen {
         }
 
         // Storage section
-        Text('存储设备')
+        Text($r('app.string.section_storage'))
           .fontSize(16)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.accentColor)
           .width('100%')
           .padding({ left: 16, top: 12, bottom: 12 })
 
-        Text('未找到视频文件')
+        Text($r('app.string.no_video_files'))
           .fontSize(14)
           .fontColor(this.onSurfaceVariantColor)
           .width('100%')
@@ -146,7 +146,7 @@ export struct BrowseScreen {
           .padding(32)
 
         // Local network section
-        Text('本地网络')
+        Text($r('app.string.section_local_network'))
           .fontSize(16)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.accentColor)
@@ -155,7 +155,7 @@ export struct BrowseScreen {
 
         // Discovered devices
         if (this.discoveredDevices.length > 0) {
-          Text(`已发现设备 (${this.discoveredDevices.length})`)
+          Text($r('app.string.discovered_devices', this.discoveredDevices.length))
             .fontSize(14)
             .fontWeight(FontWeight.Medium)
             .fontColor(this.onSurfaceVariantColor)
@@ -195,12 +195,12 @@ export struct BrowseScreen {
 
         // Add network source form
         Column() {
-          Text('添加网络源')
+          Text($r('app.string.add_network_source'))
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.onSurfaceColor)
 
-          TextInput({ text: this.titleInput, placeholder: '名称（可选）' })
+          TextInput({ text: this.titleInput, placeholder: $r('app.string.name_optional') })
             .fontSize(14)
             .fontColor(this.onSurfaceColor)
             .backgroundColor(this.surfaceVariantColor)
@@ -219,7 +219,7 @@ export struct BrowseScreen {
             .onChange((v: string) => { this.urlInput = v; })
 
           Row() {
-            TextInput({ text: this.userInput, placeholder: '用户名(可选)' })
+            TextInput({ text: this.userInput, placeholder: $r('app.string.username_optional') })
               .fontSize(14)
               .fontColor(this.onSurfaceColor)
               .backgroundColor(this.surfaceVariantColor)
@@ -228,7 +228,7 @@ export struct BrowseScreen {
               .layoutWeight(1)
               .onChange((v: string) => { this.userInput = v; })
 
-            TextInput({ text: this.passwordInput, placeholder: '密码(可选)' })
+            TextInput({ text: this.passwordInput, placeholder: $r('app.string.password_optional') })
               .fontSize(14)
               .fontColor(this.onSurfaceColor)
               .backgroundColor(this.surfaceVariantColor)
@@ -241,12 +241,12 @@ export struct BrowseScreen {
           .width('100%')
           .margin({ top: 12 })
 
-          Button('保存')
+          Button($r('app.string.action_save'))
             .width('100%')
             .margin({ top: 12 })
             .onClick(() => this.addNetworkSource())
 
-          Text('提示：请手动输入 URL。')
+          Text($r('app.string.url_input_hint'))
             .fontSize(12)
             .fontColor(this.onSurfaceVariantColor)
             .margin({ top: 12 })
@@ -259,14 +259,14 @@ export struct BrowseScreen {
 
         // Network sources list
         if (this.networkSources.length === 0) {
-          Text('尚未添加网络源')
+          Text($r('app.string.no_network_sources'))
             .fontSize(14)
             .fontColor(this.onSurfaceVariantColor)
             .width('100%')
             .textAlign(TextAlign.Center)
             .padding(32)
         } else {
-          Text('已保存的网络源')
+          Text($r('app.string.saved_network_sources'))
             .fontSize(14)
             .fontWeight(FontWeight.Medium)
             .fontColor(this.onSurfaceVariantColor)
@@ -335,7 +335,7 @@ export struct BrowseScreen {
     this.urlInput = '';
     this.userInput = '';
     this.passwordInput = '';
-    safeShowToast('已添加网络源');
+    safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_network_source_added'));
   }
 
   private async removeNetworkSource(id: string): Promise<void> {
@@ -357,13 +357,13 @@ export struct BrowseScreen {
       this.discoveredDevices = devices;
       this.isScanning = false;
       if (devices.length === 0) {
-        safeShowToast('未发现网络设备');
+        safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_no_devices_found'));
       } else {
-        safeShowToast(`发现 ${devices.length} 个设备`);
+        safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_devices_found').replace('%d', String(devices.length)));
       }
     }).catch(() => {
       this.isScanning = false;
-      safeShowToast('扫描失败');
+      safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_scan_failed'));
     });
   }
 

@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { connection } from '@kit.NetworkKit';
 import { DiscoveredDevice, DeviceType } from '../model/BrowseModels';
 import { probeOnvifDevices, OnvifDevice } from './OnvifDiscovery';
+import { rstr } from './I18nUtils';
 
 export class NetworkDiscoveryService {
   private context: common.Context;
@@ -22,7 +23,7 @@ export class NetworkDiscoveryService {
           host: dev.host,
           port: dev.port ? parseInt(dev.port) : 80,
           type: DeviceType.RTSP_CAMERA,
-          description: 'ONVIF 设备',
+          description: rstr(this.context, 'onvif_device'),
         });
       }
     } catch {

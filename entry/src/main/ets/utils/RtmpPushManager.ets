@@ -1,4 +1,6 @@
 import { socket, connection } from '@kit.NetworkKit';
+import { common } from '@kit.AbilityKit';
+import { rstr } from './I18nUtils';
 
 const TAG = 'RtmpPushManager';
 
@@ -235,6 +237,7 @@ export class RtmpPushManager {
   private tcpSocket: socket.TCPSocket | null = null;
   private status: RtmpPushStatus = 'idle';
   private config: RtmpPushConfig | null = null;
+  private context: common.Context;
   private chunkSize: number = 4096;
   private serverChunkSize: number = 4096;
   private transactionId: number = 1;
@@ -250,6 +253,10 @@ export class RtmpPushManager {
   private onStatusChange: ((status: RtmpPushStatus, message?: string) => void) | null = null;
   private startPts: number = 0;
   private hasFirstTimestamp: boolean = false;
+
+  setContext(context: common.Context): void {
+    this.context = context;
+  }
 
   setOnStatusChange(cb: (status: RtmpPushStatus, message?: string) => void): void {
     this.onStatusChange = cb;
@@ -284,7 +291,7 @@ export class RtmpPushManager {
       this.tcpSocket.on('close', () => {
         console.info(`${TAG} socket closed`);
         if (this.status !== 'disconnected' && this.status !== 'idle') {
-          this.setStatus('disconnected', '连接已关闭');
+          this.setStatus('disconnected', rstr(this.context, 'rtmp_status_disconnected'));
         }
       });
 
@@ -340,7 +347,7 @@ export class RtmpPushManager {
         if (!connected) {
           const msg = err.message;
           if (msg.includes('115') || msg.includes('Operation in progress')) {
-            throw new Error(`连接被拒绝: 服务器 ${config.host}:${config.port} 可能未开放或防火墙拦截 (errno 115)`);
+            throw new Error(rstr(this.context, 'rtmp_status_refused', config.host, String(config.port)));
           }
           throw err;
         }
@@ -352,7 +359,7 @@ export class RtmpPushManager {
     } catch (e) {
       const err = e as Error;
       console.error(`${TAG} connect failed: ${err.message}`);
-      this.setStatus('error', `连接失败: ${err.message}`);
+      this.setStatus('error', rstr(this.context, 'rtmp_status_connect_failed', err.message));
       throw err;
     }
   }
@@ -420,7 +427,7 @@ export class RtmpPushManager {
     const s0 = s0s1s2[0];
     if (s0 !== 0x03) {
       console.error(`${TAG} invalid server version: ${s0}`);
-      this.setStatus('error', '服务器版本不兼容');
+      this.setStatus('error', rstr(this.context, 'rtmp_status_version_incompatible'));
       return;
     }
 
@@ -436,7 +443,7 @@ export class RtmpPushManager {
 
     this.sendInitialCommands().catch((e: Error) => {
       console.error(`${TAG} sendInitialCommands failed: ${e.message}`);
-      this.setStatus('error', `初始化失败: ${e.message}`);
+      this.setStatus('error', rstr(this.context, 'rtmp_status_init_failed', e.message));
     });
   }
 
@@ -728,7 +735,7 @@ export class RtmpPushManager {
               console.error(`${TAG} sendCreateStream failed: ${e.message}`);
             });
           } else {
-            this.setStatus('error', `连接被拒绝: ${code ?? level ?? '未知'}`);
+            this.setStatus('error', rstr(this.context, 'rtmp_status_rejected', code ?? level ?? 'unknown'));
           }
         } else if (props) {
           const level = props.get('level');
@@ -740,7 +747,7 @@ export class RtmpPushManager {
               console.error(`${TAG} sendCreateStream failed: ${e.message}`);
             });
           } else {
-            this.setStatus('error', `连接被拒绝: ${code ?? level ?? '未知'}`);
+            this.setStatus('error', rstr(this.context, 'rtmp_status_rejected', code ?? level ?? 'unknown'));
           }
         }
       } else if (txnId === 2) {
@@ -764,11 +771,11 @@ export class RtmpPushManager {
         if (code === 'NetStream.Publish.Start') {
           this.publishing = true;
           this.sequenceHeaderSent = false;
-          this.setStatus('publishing', '推流已开始');
+          this.setStatus('publishing', rstr(this.context, 'rtmp_status_publish_started'));
         } else if (code === 'NetStream.Publish.BadName') {
-          this.setStatus('error', '流名称已被占用');
+          this.setStatus('error', rstr(this.context, 'rtmp_status_name_in_use'));
         } else if (code === 'NetStream.Failed') {
-          this.setStatus('error', '推流失败');
+          this.setStatus('error', rstr(this.context, 'rtmp_status_publish_failed'));
         }
       }
     }

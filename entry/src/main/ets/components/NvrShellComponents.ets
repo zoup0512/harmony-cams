@@ -29,7 +29,7 @@ export struct NvrMainTopBar {
   build(): void {
     Column() {
       Row() {
-        Text(this.selectedTab === 0 ? '编辑' : '')
+        Text(this.selectedTab === 0 ? $r('app.string.action_edit') : '')
           .fontSize(16)
           .fontColor(this.accentColor)
           .fontWeight(FontWeight.Medium)
@@ -74,11 +74,11 @@ export struct NvrMainTopBar {
 
   private getTabTitle(): string {
     switch (this.selectedTab) {
-      case 0: return '摄像机';
-      case 1: return '仪表板';
-      case 2: return '活动';
-      case 3: return '快照';
-      default: return '设置';
+      case 0: return getContext(this).resourceManager.getStringByNameSync('tab_cameras');
+      case 1: return getContext(this).resourceManager.getStringByNameSync('tab_dashboard');
+      case 2: return getContext(this).resourceManager.getStringByNameSync('tab_activity');
+      case 3: return getContext(this).resourceManager.getStringByNameSync('tab_snapshots');
+      default: return getContext(this).resourceManager.getStringByNameSync('tab_settings');
     }
   }
 }
@@ -105,7 +105,7 @@ export struct CameraHomeScreen {
   onAddCamera: () => void = () => {};
   onSearchChange: (query: string) => void = () => {};
   onFilterChange: (filter: string) => void = () => {};
-  @State gridColumns: number = 2;
+  @State gridColumns: number = 1;
 
   build(): void {
     if (this.cameras.length === 0) {
@@ -120,19 +120,19 @@ export struct CameraHomeScreen {
         .width(72)
         .height(72)
 
-        Text('暂无摄像机')
+        Text($r('app.string.no_cameras'))
           .fontSize(22)
           .fontColor(this.onBackgroundColor)
           .fontWeight(FontWeight.Bold)
           .margin({ top: 16 })
 
-        Text('添加 RTSP / ONVIF 设备，或先看演示')
+        Text($r('app.string.no_cameras_hint'))
           .fontSize(14)
           .fontColor(this.onSurfaceVariantColor)
           .margin({ top: 6 })
 
         Row({ space: 12 }) {
-          Text('添加摄像机')
+          Text($r('app.string.add_camera'))
             .fontSize(16)
             .fontColor(this.onPrimaryColor)
             .fontWeight(FontWeight.Bold)
@@ -141,7 +141,7 @@ export struct CameraHomeScreen {
             .borderRadius(18)
             .onClick(() => this.onAddCamera())
 
-          Text('演示模式')
+          Text($r('app.string.demo_mode'))
             .fontSize(16)
             .fontColor(this.onBackgroundColor)
             .fontWeight(FontWeight.Bold)
@@ -161,7 +161,7 @@ export struct CameraHomeScreen {
       Column() {
         // Search bar
         Row() {
-          TextInput({ text: this.searchQuery, placeholder: '搜索摄像机...' })
+          TextInput({ text: this.searchQuery, placeholder: $r('app.string.search_cameras') })
             .fontSize(14)
             .fontColor(this.onBackgroundColor)
             .backgroundColor(this.surfaceVariantColor)
@@ -184,9 +184,9 @@ export struct CameraHomeScreen {
         // Filter chips
         Row() {
           ForEach([
-            { label: '全部', value: 'all' },
-            { label: '在线', value: 'online' },
-            { label: '离线', value: 'offline' },
+            { label: getContext(this).resourceManager.getStringByNameSync('filter_all'), value: 'all' },
+            { label: getContext(this).resourceManager.getStringByNameSync('filter_online'), value: 'online' },
+            { label: getContext(this).resourceManager.getStringByNameSync('filter_offline'), value: 'offline' },
           ], (item: FilterChipItem) => {
             Text(item.label)
               .fontSize(12)
@@ -203,7 +203,7 @@ export struct CameraHomeScreen {
         .padding({ left: 18, right: 18, bottom: 8 })
 
         Row() {
-          Text(`在线 ${this.cameras.filter(c => c.isConnected).length} / ${this.cameras.length}`)
+          Text($r('app.string.online_count', this.cameras.filter(c => c.isConnected).length, this.cameras.length))
             .fontSize(14)
             .fontColor(this.onSurfaceVariantColor)
             .fontWeight(FontWeight.Medium)
@@ -343,7 +343,7 @@ export struct CameraGridCard {
       .clip(true)
 
       Row() {
-        Text(this.camera.name || '未命名')
+        Text(this.camera.name || $r('app.string.unnamed'))
           .fontSize(16)
           .fontColor(this.onBackgroundColor)
           .fontWeight(FontWeight.Bold)
@@ -498,11 +498,11 @@ export struct PlaybackFullscreenScreen {
             .width(40)
             .height(40)
             .color(this.accentColor)
-          Text('正在加载画面…')
+          Text($r('app.string.loading_stream'))
             .fontSize(14)
             .fontColor('#FFFFFF')
             .margin({ top: 12 })
-          Text('高码率视频首次缓冲可能需要几秒')
+          Text($r('app.string.loading_buffer_hint'))
             .fontSize(11)
             .fontColor('#BEBEC2')
             .margin({ top: 4 })
@@ -698,11 +698,11 @@ export struct NvrBottomBar {
   build(): void {
     Row() {
       ForEach([
-        { label: '摄像机', icon: '📹', index: 0 },
-        { label: '浏览', icon: '🧭', index: 1 },
-        { label: '活动', icon: '📊', index: 2 },
-        { label: '快照', icon: '📷', index: 3 },
-        { label: '设置', icon: '⚙', index: 4 },
+        { label: getContext(this).resourceManager.getStringByNameSync('tab_cameras'), icon: '📹', index: 0 },
+        { label: getContext(this).resourceManager.getStringByNameSync('tab_browse'), icon: '🧭', index: 1 },
+        { label: getContext(this).resourceManager.getStringByNameSync('tab_activity'), icon: '📊', index: 2 },
+        { label: getContext(this).resourceManager.getStringByNameSync('tab_snapshots'), icon: '📷', index: 3 },
+        { label: getContext(this).resourceManager.getStringByNameSync('tab_settings'), icon: '⚙', index: 4 },
       ], (item: TabBarItem) => {
         Column() {
           Text(item.icon)
@@ -751,7 +751,7 @@ export struct CameraActionOverlay {
         .onClick(() => this.onDismiss())
 
       Column() {
-        Text(this.camera.name || '未命名')
+        Text(this.camera.name || $r('app.string.unnamed'))
           .fontSize(18)
           .fontColor(this.onSurfaceColor)
           .fontWeight(FontWeight.Bold)
@@ -759,7 +759,7 @@ export struct CameraActionOverlay {
 
         Column() {
           Row() {
-            Text('编辑')
+            Text($r('app.string.action_edit'))
               .fontSize(16)
               .fontColor(this.onSurfaceColor)
               .layoutWeight(1)
@@ -775,7 +775,7 @@ export struct CameraActionOverlay {
           Divider().color(this.outlineVariantColor)
 
           Row() {
-            Text('复制')
+            Text($r('app.string.action_copy'))
               .fontSize(16)
               .fontColor(this.onSurfaceColor)
               .layoutWeight(1)
@@ -791,7 +791,7 @@ export struct CameraActionOverlay {
           Divider().color(this.outlineVariantColor)
 
           Row() {
-            Text('删除')
+            Text($r('app.string.action_delete'))
               .fontSize(16)
               .fontColor(this.onSurfaceColor)
               .layoutWeight(1)

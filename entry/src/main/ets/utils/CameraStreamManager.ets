@@ -4,6 +4,7 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { RtspServer } from './RtspServer';
 import { RtmpPushManager, RtmpPushConfig, parseRtmpUrl, RtmpPushStatus } from './RtmpPushManager';
 import { PHONE_RTSP_PORT } from './NetworkUtils';
+import { rstr, rstrNum } from './I18nUtils';
 import { createEncoder, startEncoder, stopEncoder, releaseEncoder, EncodedFrame } from 'librtspencoder.so';
 
 const TAG = 'CameraStreamManager';
@@ -86,20 +87,20 @@ export class CameraStreamManager {
     if (this.streaming) {
       if (this.streamMode === 'rtmp') {
         if (this.rtmpPushManager && this.rtmpPushManager.isPublishing()) {
-          return 'RTMP 推流中';
+          return rstr(this.context, 'cam_status_rtmp_streaming');
         }
-        return this.rtmpStatusText || 'RTMP 连接中...';
+        return this.rtmpStatusText || rstr(this.context, 'cam_status_rtmp_connecting');
       }
       const count = this.rtspServer.getClientCount();
       if (count > 0) {
-        return `推流中 · ${count}个客户端连接`;
+        return rstrNum(this.context, 'cam_status_streaming_clients', count);
       }
-      return '推流中 · 等待客户端连接';
+      return rstr(this.context, 'cam_status_streaming_waiting');
     }
     if (this.previewReady) {
-      return '预览已就绪';
+      return rstr(this.context, 'cam_status_preview_ready');
     }
-    return '未启动';
+    return rstr(this.context, 'cam_status_not_started');
   }
 
   private async ensureCameraPermission(): Promise<boolean> {
@@ -129,7 +130,7 @@ export class CameraStreamManager {
         this.statusCallback?.({
           isStreaming: false,
           isPreviewReady: false,
-          statusText: '需要相机权限',
+          statusText: rstr(this.context, 'cam_status_need_camera_permission'),
           clientCount: 0,
         });
         return;
@@ -147,7 +148,7 @@ export class CameraStreamManager {
         this.statusCallback?.({
           isStreaming: false,
           isPreviewReady: false,
-          statusText: '未找到摄像头',
+          statusText: rstr(this.context, 'cam_status_no_camera'),
           clientCount: 0,
         });
         return;
@@ -181,7 +182,7 @@ export class CameraStreamManager {
         this.statusCallback?.({
           isStreaming: false,
           isPreviewReady: false,
-          statusText: '创建相机会话失败',
+          statusText: rstr(this.context, 'cam_status_session_failed'),
           clientCount: 0,
         });
         return;
@@ -208,7 +209,7 @@ export class CameraStreamManager {
       this.statusCallback?.({
         isStreaming: false,
         isPreviewReady: false,
-        statusText: `预览初始化失败: ${err.message}`,
+        statusText: rstr(this.context, 'cam_status_preview_init_failed', err.message),
         clientCount: 0,
       });
     }
@@ -238,12 +239,13 @@ export class CameraStreamManager {
           this.statusCallback?.({
             isStreaming: false,
             isPreviewReady: this.previewReady,
-            statusText: '请先配置 RTMP 服务器',
+            statusText: rstr(this.context, 'cam_status_configure_rtmp'),
             clientCount: 0,
           });
           return;
         }
         this.rtmpPushManager = new RtmpPushManager();
+        this.rtmpPushManager.setContext(this.context);
         this.rtmpPushManager.setOnStatusChange((status: RtmpPushStatus, message?: string) => {
           if (message) this.rtmpStatusText = message;
           else this.rtmpStatusText = '';
@@ -312,7 +314,7 @@ export class CameraStreamManager {
       this.statusCallback?.({
         isStreaming: false,
         isPreviewReady: this.previewReady,
-        statusText: `启动失败: ${err.message}`,
+        statusText: rstr(this.context, 'cam_status_start_failed', err.message),
         clientCount: 0,
       });
     }

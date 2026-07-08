@@ -289,7 +289,7 @@ struct MainPage {
                   .width(48)
                   .height(48)
                   .color(this.colors.primary)
-                Text('加载中...')
+                Text($r('app.string.loading_app'))
                   .fontSize(14)
                   .fontColor(this.colors.onSurfaceVariant)
                   .margin({ top: 12 })
@@ -394,7 +394,7 @@ struct MainPage {
                     onRtmpAudioEnabledChange: (v: boolean) => { this.vm?.onRtmpAudioEnabledChange(v); this.syncState(); },
                     onRtmpAutoStreamChange: (v: boolean) => { this.vm?.onRtmpAutoStreamChange(v); this.syncState(); },
                     onClearRecordings: () => { this.vm?.clearRecordings(); this.syncState(); },
-                    onManageRtmpSettings: () => safeShowToast('请在推流页面配置 RTMP 服务器地址'),
+                    onManageRtmpSettings: () => safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_rtmp_configure_hint')),
                     appLockEnabled: this.uiState.appLockEnabled ?? false,
                     onAppLockChange: (enabled: boolean) => {
                       if (enabled) {
@@ -486,7 +486,7 @@ struct MainPage {
                 const deleted = this.vm.storageManager.deleteFile(file.filePath);
                 this.vm.onPendingDeleteSnapshotChange(null);
                 this.vm.reloadSnapshots().then(() => this.syncState());
-                safeShowToast(deleted ? '快照已删除' : '删除失败');
+                safeShowToast(deleted ? getContext(this).resourceManager.getStringByNameSync('toast_snapshot_deleted') : getContext(this).resourceManager.getStringByNameSync('toast_delete_failed'));
               }
               this.syncState();
             },
@@ -513,7 +513,7 @@ struct MainPage {
         .fontSize(48)
         .margin({ bottom: 20 })
 
-      Text('请输入 PIN 码')
+      Text($r('app.string.enter_pin'))
         .fontSize(20)
         .fontColor(this.colors.onBackground)
         .fontWeight(FontWeight.Bold)
@@ -529,7 +529,7 @@ struct MainPage {
         .type(InputType.Password)
         .onChange((v: string) => { this.pinInput = v; })
 
-      Text('解锁')
+      Text($r('app.string.action_unlock'))
         .fontSize(16)
         .fontColor(this.colors.onPrimary)
         .fontWeight(FontWeight.Bold)
@@ -544,7 +544,7 @@ struct MainPage {
                 this.pinInput = '';
                 this.syncState();
               } else {
-                safeShowToast('PIN 码错误');
+                safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_pin_error'));
                 this.pinInput = '';
               }
             });
@@ -773,11 +773,11 @@ struct MainPage {
         if (this.isMuted) {
           this.isMuted = false;
           this.vm?.onCurrentPlayerSetVolume(this.lastNonZeroVolume);
-          safeShowToast('已恢复声音');
+          safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_sound_restored'));
         } else {
           this.isMuted = true;
           this.vm?.onCurrentPlayerSetVolume(0);
-          safeShowToast('已静音');
+          safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_muted'));
         }
       },
       onSnapshot: () => {
@@ -785,12 +785,12 @@ struct MainPage {
         const cam = this.getFullscreenCamera();
         const cameraName = cam?.name ?? cameraId ?? '';
         if (!cameraId) {
-          safeShowToast('无法截取快照：缺少相机信息');
+          safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_no_camera_info'));
           return;
         }
         this.vm?.saveSnapshot(cameraId, cameraName).then(() => this.syncState());
       },
-      onMore: () => safeShowToast('更多功能开发中'),
+      onMore: () => safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_more_coming')),
       onToggleRecord: () => { this.vm?.toggleRecording().then(() => this.syncState()); },
       onSwipeLeft: () => this.switchCamera(1),
       onSwipeRight: () => this.switchCamera(-1),
@@ -800,13 +800,13 @@ struct MainPage {
 
   private getDeviceManageTitle(): string {
     switch (this.uiState.deviceForm.deviceFlowStep) {
-      case DeviceFlowStep.Landing: return '添加相机';
-      case DeviceFlowStep.Verifying: return '';
-      case DeviceFlowStep.VendorPicker: return '选择制造商';
+      case DeviceFlowStep.Landing: return getContext(this).resourceManager.getStringByNameSync('device_manage_title_add');
+      case DeviceFlowStep.Verifying: return getContext(this).resourceManager.getStringByNameSync('device_manage_title_verifying');
+      case DeviceFlowStep.VendorPicker: return getContext(this).resourceManager.getStringByNameSync('select_manufacturer');
       case DeviceFlowStep.Form:
         return this.uiState.deviceForm.selectedDeviceId === null
-          ? ''
-          : (this.uiState.deviceForm.manageName || '设备设置');
+          ? getContext(this).resourceManager.getStringByNameSync('device_manage_title_new')
+          : (this.uiState.deviceForm.manageName || getContext(this).resourceManager.getStringByNameSync('device_manage_title_edit'));
       default: return '';
     }
   }
@@ -849,7 +849,7 @@ struct MainPage {
     const idx = this.cameras.findIndex(c => c.id === device.id);
     this.vm.onSelectedCameraIndexChange(idx >= 0 ? idx : 0);
     if (!this.isVlcAvailable) {
-      safeShowToast('播放器运行时不可用');
+      safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_player_unavailable'));
       return;
     }
     const cameraToPlay = await enrichCameraRtspUrl(device, this.vm.prefs);

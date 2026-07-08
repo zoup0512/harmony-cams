@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
+import { rstr } from './I18nUtils';
 
 const TAG = 'StreamConfig';
 
@@ -30,7 +31,7 @@ const DEFAULT_CONFIG: StreamDefaultConfig = {
     port: 1935,
   },
   hls: {
-    name: '默认HLS流',
+    name: '',
     url: 'http://www.razor51.site:2022/live/1/livestream.m3u8',
   },
 };
@@ -52,13 +53,20 @@ export async function loadStreamConfig(context: common.Context): Promise<StreamD
         port: json.rtmp.port || DEFAULT_CONFIG.rtmp.port,
       },
       hls: {
-        name: json.hls.name || DEFAULT_CONFIG.hls.name,
+        name: json.hls.name || rstr(context, 'default_hls_name'),
         url: json.hls.url || DEFAULT_CONFIG.hls.url,
       },
     };
     return result;
   } catch (e) {
     console.warn(`${TAG} failed to load stream_config.json, using built-in defaults: ${(e as Error).message}`);
-    return DEFAULT_CONFIG;
+    const fallback: StreamDefaultConfig = {
+      rtmp: DEFAULT_CONFIG.rtmp,
+      hls: {
+        name: rstr(context, 'default_hls_name'),
+        url: DEFAULT_CONFIG.hls.url,
+      },
+    };
+    return fallback;
   }
 }
