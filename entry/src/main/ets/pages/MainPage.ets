@@ -415,7 +415,7 @@ struct MainPage {
             NvrBottomBar({
               selectedTab: this.uiState.selectedTab,
               accentColor: this.colors.primary,
-              surfaceColor: this.colors.surface,
+              bgColor: this.colors.background,
               onSurfaceVariantColor: this.colors.onSurfaceVariant,
               onPrimaryColor: this.colors.onPrimary,
               onTabSelected: (index: number) => this.onTabSelected(index),

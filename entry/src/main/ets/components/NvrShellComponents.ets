@@ -691,7 +691,7 @@ export struct PlaybackFullscreenScreen {
 export struct NvrBottomBar {
   selectedTab: number = 0;
   accentColor: string = '#20B486';
-  surfaceColor: string = '#FFFFFF';
+  bgColor: string = '#F7F8FA';
   onSurfaceVariantColor: string = '#6B6F76';
   onPrimaryColor: string = '#FFFFFF';
   onTabSelected: (index: number) => void = () => {};
@@ -725,7 +725,7 @@ export struct NvrBottomBar {
     .width('100%')
     .justifyContent(FlexAlign.SpaceEvenly)
     .alignItems(VerticalAlign.Center)
-    .backgroundColor(this.surfaceColor)
+    .backgroundColor(this.bgColor)
     .padding({ left: 6, right: 6, top: 8, bottom: 8 })
   }
 }
