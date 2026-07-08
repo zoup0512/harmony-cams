@@ -17,11 +17,11 @@ interface TabBarItem {
 
 @Component
 export struct NvrMainTopBar {
-  selectedTab: number = 0;
-  accentColor: string = '#20B486';
-  bgColor: string = '#F7F8FA';
-  onBackgroundColor: string = '#1B1B1D';
-  onPrimaryColor: string = '#FFFFFF';
+  @Prop selectedTab: number = 0;
+  @Prop accentColor: string = '#20B486';
+  @Prop bgColor: string = '#F7F8FA';
+  @Prop onBackgroundColor: string = '#1B1B1D';
+  @Prop onPrimaryColor: string = '#FFFFFF';
   onEditClick: () => void = () => {};
   onMenuClick: () => void = () => {};
   onAddClick: () => void = () => {};
@@ -87,19 +87,19 @@ export struct NvrMainTopBar {
 export struct CameraHomeScreen {
   @Prop cameras: CameraDevice[] = [];
   @Prop snapshots: RecordingFile[] = [];
-  selectedCameraId: string = '';
-  playingCameraId: string = '';
-  accentColor: string = '#20B486';
-  bgColor: string = '#F7F8FA';
-  surfaceColor: string = '#FFFFFF';
-  surfaceVariantColor: string = '#F0F1F5';
-  onBackgroundColor: string = '#1B1B1D';
-  onSurfaceVariantColor: string = '#6B6F76';
-  onPrimaryColor: string = '#FFFFFF';
-  secondaryContainerColor: string = '#D6F3E8';
-  errorColor: string = '#E53935';
-  searchQuery: string = '';
-  cameraFilter: string = 'all';
+  @Prop selectedCameraId: string = '';
+  @Prop playingCameraId: string = '';
+  @Prop accentColor: string = '#20B486';
+  @Prop bgColor: string = '#F7F8FA';
+  @Prop surfaceColor: string = '#FFFFFF';
+  @Prop surfaceVariantColor: string = '#F0F1F5';
+  @Prop onBackgroundColor: string = '#1B1B1D';
+  @Prop onSurfaceVariantColor: string = '#6B6F76';
+  @Prop onPrimaryColor: string = '#FFFFFF';
+  @Prop secondaryContainerColor: string = '#D6F3E8';
+  @Prop errorColor: string = '#E53935';
+  @Prop searchQuery: string = '';
+  @Prop cameraFilter: string = 'all';
   onCameraClick: (device: CameraDevice) => void = () => {};
   onCameraLongPress: (device: CameraDevice) => void = () => {};
   onAddCamera: () => void = () => {};
@@ -263,15 +263,15 @@ export struct CameraHomeScreen {
 
 @Component
 export struct CameraGridCard {
-  camera: CameraDevice = { id: '', name: '', rtspUrl: '', isRecording: false, isConnected: false };
-  isSelected: boolean = false;
-  isPlaying: boolean = false;
-  accentColor: string = '#20B486';
-  surfaceVariantColor: string = '#F0F1F5';
-  onBackgroundColor: string = '#1B1B1D';
-  onSurfaceVariantColor: string = '#6B6F76';
-  secondaryContainerColor: string = '#D6F3E8';
-  errorColor: string = '#E53935';
+  @Prop camera: CameraDevice = { id: '', name: '', rtspUrl: '', isRecording: false, isConnected: false };
+  @Prop isSelected: boolean = false;
+  @Prop isPlaying: boolean = false;
+  @Prop accentColor: string = '#20B486';
+  @Prop surfaceVariantColor: string = '#F0F1F5';
+  @Prop onBackgroundColor: string = '#1B1B1D';
+  @Prop onSurfaceVariantColor: string = '#6B6F76';
+  @Prop secondaryContainerColor: string = '#D6F3E8';
+  @Prop errorColor: string = '#E53935';
   onCardClick: () => void = () => {};
   onLongPress: () => void = () => {};
 
@@ -395,17 +395,17 @@ export struct CameraGridCard {
 
 @Component
 export struct PlaybackFullscreenScreen {
-  camera: CameraDevice = { id: '', name: '', rtspUrl: '', isRecording: false, isConnected: false };
-  badge: string = 'CAM';
+  @Prop camera: CameraDevice = { id: '', name: '', rtspUrl: '', isRecording: false, isConnected: false };
+  @Prop badge: string = 'CAM';
   @Prop isPlaying: boolean = false;
   @Prop isMuted: boolean = false;
   @Prop isVideoReady: boolean = false;
   @Prop isRecording: boolean = false;
-  accentColor: string = '#20B486';
-  onPrimaryColor: string = '#FFFFFF';
-  errorColor: string = '#E53935';
-  surfaceVariantColor: string = '#F0F1F5';
-  surfaceId: string = '';
+  @Prop accentColor: string = '#20B486';
+  @Prop onPrimaryColor: string = '#FFFFFF';
+  @Prop errorColor: string = '#E53935';
+  @Prop surfaceVariantColor: string = '#F0F1F5';
+  @Prop surfaceId: string = '';
   onBindSurface: (id: string) => void = () => {};
   onBack: () => void = () => {};
   onTogglePlayPause: () => void = () => {};
@@ -689,11 +689,11 @@ export struct PlaybackFullscreenScreen {
 
 @Component
 export struct NvrBottomBar {
-  selectedTab: number = 0;
-  accentColor: string = '#20B486';
-  bgColor: string = '#F7F8FA';
-  onSurfaceVariantColor: string = '#6B6F76';
-  onPrimaryColor: string = '#FFFFFF';
+  @Prop selectedTab: number = 0;
+  @Prop accentColor: string = '#20B486';
+  @Prop bgColor: string = '#F7F8FA';
+  @Prop onSurfaceVariantColor: string = '#6B6F76';
+  @Prop onPrimaryColor: string = '#FFFFFF';
   onTabSelected: (index: number) => void = () => {};
 
   build(): void {
@@ -732,12 +732,12 @@ export struct NvrBottomBar {
 
 @Component
 export struct CameraActionOverlay {
-  camera: CameraDevice = { id: '', name: '', rtspUrl: '', isRecording: false, isConnected: false };
-  badge: string = 'CAM';
-  accentColor: string = '#20B486';
-  surfaceColor: string = '#FFFFFF';
-  onSurfaceColor: string = '#1B1B1D';
-  outlineVariantColor: string = '#E0E2E8';
+  @Prop camera: CameraDevice = { id: '', name: '', rtspUrl: '', isRecording: false, isConnected: false };
+  @Prop badge: string = 'CAM';
+  @Prop accentColor: string = '#20B486';
+  @Prop surfaceColor: string = '#FFFFFF';
+  @Prop onSurfaceColor: string = '#1B1B1D';
+  @Prop outlineVariantColor: string = '#E0E2E8';
   onDismiss: () => void = () => {};
   onEdit: () => void = () => {};
   onCopy: () => void = () => {};
