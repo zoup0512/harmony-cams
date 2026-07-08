@@ -430,7 +430,7 @@ struct MainPage {
       if (this.getCameraInAction() !== null && this.uiState.selectedTab !== 5) {
         CameraActionOverlay({
           camera: this.getCameraInAction()!,
-          badge: 'CAM',
+          badge: getContext(this).resourceManager.getStringByNameSync('badge_cam'),
           accentColor: this.colors.primary,
           surfaceColor: this.colors.surface,
           onSurfaceColor: this.colors.onSurface,
@@ -710,7 +710,7 @@ struct MainPage {
   PlaybackFullscreenContent() {
     PlaybackFullscreenScreen({
       camera: this.getFullscreenCamera()!,
-      badge: 'CAM',
+      badge: getContext(this).resourceManager.getStringByNameSync('badge_cam'),
       isPlaying: this.playbackControlPlaying,
       isMuted: this.isMuted,
       isVideoReady: this.isVideoReady,

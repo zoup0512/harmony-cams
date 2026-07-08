@@ -302,6 +302,7 @@ export struct CameraGridCard {
             .fontSize(10)
             .fontColor('#FFFFFFEB')
             .fontWeight(FontWeight.Bold)
+            .maxLines(1)
         }
         .padding({ left: 8, right: 8, top: 4, bottom: 4 })
         .backgroundColor('#6B000000')
@@ -310,7 +311,7 @@ export struct CameraGridCard {
         .margin({ left: 8, top: 8 })
 
         if (this.isPlaying) {
-          Text('REC')
+          Text($r('app.string.badge_rec'))
             .fontSize(10)
             .fontColor('#FFFFFFEB')
             .fontWeight(FontWeight.Bold)
@@ -351,7 +352,7 @@ export struct CameraGridCard {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
 
-        Text('CAM')
+        Text($r('app.string.badge_cam'))
           .fontSize(12)
           .fontColor(this.onSurfaceVariantColor)
           .padding({ left: 14, right: 14, top: 6, bottom: 6 })
@@ -371,10 +372,10 @@ export struct CameraGridCard {
     )
   }
 
-  private getStatusLabel(): string {
-    if (this.isPlaying) return 'LIVE';
-    if (this.camera.isConnected) return 'STANDBY';
-    return 'OFFLINE';
+  private getStatusLabel(): ResourceStr {
+    if (this.isPlaying) return $r('app.string.status_live');
+    if (this.camera.isConnected) return $r('app.string.status_standby');
+    return $r('app.string.status_offline');
   }
 
   private getStatusDotColor(): ResourceColor {
