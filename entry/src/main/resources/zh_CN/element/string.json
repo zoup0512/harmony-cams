@@ -65,6 +65,8 @@
     { "name": "no_activity", "value": "暂无活动记录" },
 
     { "name": "no_snapshots", "value": "暂无快照" },
+    { "name": "no_snapshots_hint", "value": "在摄像机播放时点击截图按钮来创建快照" },
+    { "name": "no_snapshots_action", "value": "查看更多" },
     { "name": "date_today", "value": "今天" },
     { "name": "date_yesterday", "value": "昨天" },
     { "name": "date_unknown", "value": "未知日期" },

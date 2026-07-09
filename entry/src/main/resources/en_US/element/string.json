@@ -65,6 +65,8 @@
     { "name": "no_activity", "value": "No activity records" },
 
     { "name": "no_snapshots", "value": "No Snapshots" },
+    { "name": "no_snapshots_hint", "value": "Take snapshots during camera playback by pressing the capture button" },
+    { "name": "no_snapshots_action", "value": "Learn More" },
     { "name": "date_today", "value": "Today" },
     { "name": "date_yesterday", "value": "Yesterday" },
     { "name": "date_unknown", "value": "Unknown Date" },

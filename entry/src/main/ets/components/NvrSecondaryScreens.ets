@@ -304,17 +304,87 @@ export struct SnapshotScreen {
   onSurfaceColor: string = '#1B1B1D';
   onSurfaceVariantColor: string = '#6B6F76';
   accentColor: string = '#20B486';
+  onPrimaryColor: string = '#FFFFFF';
   onOpenSnapshot: (file: RecordingFile) => void = () => {};
   onDeleteSnapshot: (file: RecordingFile) => void = () => {};
   onShareSnapshot: (file: RecordingFile) => void = () => {};
+  onViewMore: () => void = () => {};
 
   build(): void {
     Scroll() {
       Column() {
         if (this.snapshots.length === 0) {
-          Text($r('app.string.no_snapshots'))
-            .fontSize(16)
-            .fontColor(this.onSurfaceVariantColor)
+          Column() {
+            Stack() {
+              Circle({ width: 180, height: 180 })
+                .fill('#1A3A3A')
+
+              Column() {
+                Row() {
+                  Column()
+                    .width(52)
+                    .height(40)
+                    .borderRadius(6)
+                    .border({ width: 2, color: '#6B8A7A' })
+                    .backgroundColor(Color.Transparent)
+                    .position({ x: 0, y: 8 })
+
+                  Column()
+                    .width(52)
+                    .height(40)
+                    .borderRadius(6)
+                    .border({ width: 2, color: this.accentColor })
+                    .backgroundColor(Color.Transparent)
+                    .position({ x: 16, y: 0 })
+                }
+                .width(68)
+                .height(48)
+
+                Row() {
+                  Circle({ width: 8, height: 8 })
+                    .fill(this.accentColor)
+                    .margin({ right: 6 })
+
+                  Column()
+                    .width(16)
+                    .height(10)
+                    .backgroundColor(this.accentColor)
+                    .borderRadius({ topLeft: 0, topRight: 0, bottomLeft: 5, bottomRight: 5 })
+                }
+                .margin({ top: -2 })
+              }
+            }
+            .width(180)
+            .height(180)
+
+            Text($r('app.string.tab_snapshots'))
+              .fontSize(24)
+              .fontColor(this.onSurfaceColor)
+              .fontWeight(FontWeight.Bold)
+              .margin({ top: 28 })
+
+            Text($r('app.string.no_snapshots_hint'))
+              .fontSize(14)
+              .fontColor(this.onSurfaceVariantColor)
+              .textAlign(TextAlign.Center)
+              .margin({ top: 10, left: 32, right: 32 })
+
+            Text($r('app.string.no_snapshots_action'))
+              .fontSize(16)
+              .fontColor(this.onPrimaryColor)
+              .fontWeight(FontWeight.Bold)
+              .textAlign(TextAlign.Center)
+              .padding({ left: 40, right: 40, top: 14, bottom: 14 })
+              .backgroundColor(this.accentColor)
+              .borderRadius(26)
+              .margin({ top: 36 })
+              .width('80%')
+              .onClick(() => this.onViewMore())
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .justifyContent(FlexAlign.Center)
+          .alignItems(HorizontalAlign.Center)
         } else {
         ForEach(groupSnapshotsByDate(this.snapshots, getContext(this)), (group: SnapshotGroup) => {
           Text(group.label)

@@ -362,9 +362,11 @@ struct MainPage {
                     onSurfaceColor: this.colors.onSurface,
                     onSurfaceVariantColor: this.colors.onSurfaceVariant,
                     accentColor: this.colors.primary,
+                    onPrimaryColor: this.colors.onPrimary,
                     onOpenSnapshot: (file: RecordingFile) => this.onOpenRecording(file),
                     onDeleteSnapshot: (file: RecordingFile) => this.onDeleteSnapshot(file),
                     onShareSnapshot: (file: RecordingFile) => { this.vm?.shareSnapshot(file.filePath); },
+                    onViewMore: () => this.onTabSelected(0),
                   })
                 } else if (this.uiState.selectedTab === 4) {
                   SettingsHomeScreen({
