@@ -466,8 +466,11 @@ export struct SettingsHomeScreen {
           // Storage path
           Column() {
             Text($r('app.string.settings_storage_path'))
-              .fontSize(13)
-              .fontColor(this.onSurfaceVariantColor)
+              .fontSize(14)
+              .fontColor(this.onSurfaceColor)
+              .fontWeight(FontWeight.Medium)
+              .width('100%')
+              .textAlign(TextAlign.Start)
             Row() {
               Text(this.storagePathInput || $r('app.string.storage_path_hint'))
                 .fontSize(14)
@@ -496,8 +499,11 @@ export struct SettingsHomeScreen {
           // Recording quality
           Column() {
             Text($r('app.string.settings_recording_quality'))
-              .fontSize(13)
-              .fontColor(this.onSurfaceVariantColor)
+              .fontSize(14)
+              .fontColor(this.onSurfaceColor)
+              .fontWeight(FontWeight.Medium)
+              .width('100%')
+              .textAlign(TextAlign.Start)
             Row({ space: 8 }) {
               ForEach(['4K', '1080p', '720p', '480p'], (option: string) => {
                 Text(option)
@@ -523,8 +529,11 @@ export struct SettingsHomeScreen {
           // Recording duration
           Column() {
             Text($r('app.string.settings_recording_duration'))
-              .fontSize(13)
-              .fontColor(this.onSurfaceVariantColor)
+              .fontSize(14)
+              .fontColor(this.onSurfaceColor)
+              .fontWeight(FontWeight.Medium)
+              .width('100%')
+              .textAlign(TextAlign.Start)
             TextInput({ text: this.recordingDurationInput, placeholder: $r('app.string.duration_hint') })
               .fontSize(14)
               .fontColor(this.onSurfaceColor)
@@ -692,8 +701,11 @@ export struct SettingsHomeScreen {
   SettingsTextField(label: Resource, hint: Resource, value: string, onChange: (v: string) => void, password: boolean) {
     Column() {
       Text(label)
-        .fontSize(13)
-        .fontColor(this.onSurfaceVariantColor)
+        .fontSize(14)
+        .fontColor(this.onSurfaceColor)
+        .fontWeight(FontWeight.Medium)
+        .width('100%')
+        .textAlign(TextAlign.Start)
       if (password) {
         TextInput({ text: value, placeholder: hint })
           .fontSize(14)

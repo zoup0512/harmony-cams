@@ -111,6 +111,7 @@ export interface NvrUiState {
   cameraFilter?: 'all' | 'online' | 'offline';
   appLockEnabled?: boolean;
   isAppLocked?: boolean;
+  gridColumns?: number;
 }
 
 export function copyPlaybackState(src: NvrPlaybackState): NvrPlaybackState {
@@ -178,6 +179,7 @@ export function copyUiState(src: NvrUiState): NvrUiState {
     cameraFilter: src.cameraFilter,
     appLockEnabled: src.appLockEnabled,
     isAppLocked: src.isAppLocked,
+    gridColumns: src.gridColumns,
   };
 }
 
@@ -195,5 +197,6 @@ export function defaultUiState(): NvrUiState {
     cameraFilter: 'all',
     appLockEnabled: false,
     isAppLocked: false,
+    gridColumns: 1,
   };
 }

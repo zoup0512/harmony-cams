@@ -93,6 +93,7 @@ export class NvrViewModel {
 
     this.uiState.appLockEnabled = await this.prefs.getBoolean('app_lock_enabled', false);
     this.uiState.isAppLocked = this.uiState.appLockEnabled;
+    this.uiState.gridColumns = await this.prefs.getNumber('grid_columns', 1);
 
     await this.addDefaultCameraIfNeeded();
     await this.reloadCameras();
@@ -580,6 +581,11 @@ export class NvrViewModel {
 
   onSelectedCameraIndexChange(index: number): void {
     this.uiState.selectedCameraIndex = index;
+  }
+
+  onGridColumnsChange(cols: number): void {
+    this.uiState.gridColumns = cols;
+    this.prefs.putNumber('grid_columns', cols);
   }
 
   onPlaybackFullscreenChange(fullscreen: boolean): void {

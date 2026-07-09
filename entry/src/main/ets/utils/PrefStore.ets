@@ -46,6 +46,18 @@ export class PrefStore {
     }
   }
 
+  async getNumber(key: string, defaultValue: number = 0): Promise<number> {
+    if (!this.prefs) await this.init();
+    if (!this.prefs) return defaultValue;
+    try {
+      const val = await this.prefs.get(key, defaultValue);
+      return val as number;
+    } catch (e) {
+      console.error(`PrefStore getNumber failed: ${(e as Error).message}`);
+      return defaultValue;
+    }
+  }
+
   async putString(key: string, value: string): Promise<void> {
     if (!this.prefs) await this.init();
     if (!this.prefs) return;
@@ -65,6 +77,17 @@ export class PrefStore {
       await this.prefs.flush();
     } catch (e) {
       console.error(`PrefStore putBoolean failed: ${(e as Error).message}`);
+    }
+  }
+
+  async putNumber(key: string, value: number): Promise<void> {
+    if (!this.prefs) await this.init();
+    if (!this.prefs) return;
+    try {
+      await this.prefs.put(key, value);
+      await this.prefs.flush();
+    } catch (e) {
+      console.error(`PrefStore putNumber failed: ${(e as Error).message}`);
     }
   }
 

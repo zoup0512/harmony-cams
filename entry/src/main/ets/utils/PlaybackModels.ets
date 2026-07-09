@@ -210,24 +210,37 @@ export async function buildDeviceManageFormValue(
 ): Promise<DeviceManageFormValue> {
   const streamType = playbackStreamTypeFromUrl(device.rtspUrl) ?? PlaybackStreamType.RTSP;
   const parsed = parsePlaybackUrl(device.rtspUrl);
-  const username = parsed.username || await prefs.getString(`camera_username_${device.id}`, '');
+  const results = await Promise.all([
+    prefs.getString(`camera_username_${device.id}`, ''),
+    prefs.getString(`camera_vendor_${device.id}`, 'TP-Link'),
+    prefs.getString(`camera_profile_${device.id}`, 'default'),
+    prefs.getString(`camera_password_${device.id}`, ''),
+    prefs.getBoolean(`camera_force_http_software_decode_${device.id}`, false),
+  ]);
+  const prefUsername = results[0] as string;
+  const vendor = results[1] as string;
+  const profile = results[2] as string;
+  const password = results[3] as string;
+  const forceHttpSoftwareDecode = results[4] as boolean;
+  const username = parsed.username || prefUsername;
+  const loginEnabled = await prefs.getBoolean(
+    `camera_login_enabled_${device.id}`,
+    parsed.username !== '' || prefUsername !== '',
+  );
   return {
     selectedDeviceId: device.id,
     manageName: device.name,
-    manageVendor: await prefs.getString(`camera_vendor_${device.id}`, 'TP-Link'),
-    manageProfile: await prefs.getString(`camera_profile_${device.id}`, 'default'),
+    manageVendor: vendor,
+    manageProfile: profile,
     manageStreamScheme: streamType === PlaybackStreamType.RTMP ? PlaybackStreamType.HTTP : streamType,
     manageStreamPath: parsed.path === '' ? 'stream1' : parsed.path,
     manageHost: parsed.host,
     managePort: parsed.port || defaultPlaybackPort(streamType),
-    manageLoginEnabled: await prefs.getBoolean(
-      `camera_login_enabled_${device.id}`,
-      parsed.username !== '' || username !== '',
-    ),
+    manageLoginEnabled: loginEnabled,
     manageUsername: username,
-    managePassword: parsed.password || await prefs.getString(`camera_password_${device.id}`, ''),
+    managePassword: parsed.password || password,
     managePasswordVisible: false,
-    forceHttpSoftwareDecode: await prefs.getBoolean(`camera_force_http_software_decode_${device.id}`, false),
+    forceHttpSoftwareDecode,
   };
 }
 

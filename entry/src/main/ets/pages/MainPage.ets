@@ -325,6 +325,8 @@ struct MainPage {
                       onAddCamera: () => this.onAddCamera(),
                       onSearchChange: (q: string) => { this.vm?.setSearchQuery(q); this.syncState(); },
                       onFilterChange: (f: string) => { this.vm?.setCameraFilter(f as 'all' | 'online' | 'offline'); this.syncState(); },
+                      gridColumns: this.uiState.gridColumns ?? 1,
+                      onGridColumnsChange: (cols: number) => { this.vm?.onGridColumnsChange(cols); this.syncState(); },
                     })
                 } else if (this.uiState.selectedTab === 1) {
                   BrowseScreen({
@@ -447,7 +449,7 @@ struct MainPage {
           onEdit: () => {
             const cam = this.getCameraInAction();
             this.vm?.onLongPressedCameraIdChange(null);
-            if (cam) { this.vm?.openEditForm(cam); }
+            if (cam) { this.vm?.openEditForm(cam).then(() => this.syncState()); }
             this.syncState();
           },
           onCopy: () => {

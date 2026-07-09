@@ -105,7 +105,8 @@ export struct CameraHomeScreen {
   onAddCamera: () => void = () => {};
   onSearchChange: (query: string) => void = () => {};
   onFilterChange: (filter: string) => void = () => {};
-  @State gridColumns: number = 1;
+  @Prop gridColumns: number = 1;
+  onGridColumnsChange: (cols: number) => void = () => {};
 
   build(): void {
     if (this.cameras.length === 0) {
@@ -217,7 +218,7 @@ export struct CameraHomeScreen {
                 .padding({ left: 12, right: 12, top: 6, bottom: 6 })
                 .backgroundColor(this.gridColumns === cols ? this.secondaryContainerColor : Color.Transparent)
                 .borderRadius(999)
-                .onClick(() => { this.gridColumns = cols; })
+                .onClick(() => { this.onGridColumnsChange(cols); })
             })
           }
           .backgroundColor(this.surfaceVariantColor)
