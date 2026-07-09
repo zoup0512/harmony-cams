@@ -237,6 +237,7 @@ export struct CameraHomeScreen {
                 isSelected: this.selectedCameraId === device.id,
                 isPlaying: this.playingCameraId === device.id,
                 accentColor: this.accentColor,
+                surfaceColor: this.surfaceColor,
                 surfaceVariantColor: this.surfaceVariantColor,
                 onBackgroundColor: this.onBackgroundColor,
                 onSurfaceVariantColor: this.onSurfaceVariantColor,
@@ -272,6 +273,8 @@ export struct CameraGridCard {
   @Prop onSurfaceVariantColor: string = '#6B6F76';
   @Prop secondaryContainerColor: string = '#D6F3E8';
   @Prop errorColor: string = '#E53935';
+  @Prop surfaceColor: string = '#FFFFFF';
+  @Prop outlineVariantColor: string = '#E0E2E8';
   onCardClick: () => void = () => {};
   onLongPress: () => void = () => {};
 
@@ -283,12 +286,12 @@ export struct CameraGridCard {
             .width('100%')
             .height('100%')
             .objectFit(ImageFit.Cover)
-            .borderRadius(14)
+            .borderRadius({ topLeft: 12, topRight: 12 })
         } else {
           Column()
             .width('100%')
             .aspectRatio(1.55)
-            .borderRadius(14)
+            .borderRadius({ topLeft: 12, topRight: 12 })
             .linearGradient({
               direction: GradientDirection.Right,
               colors: [[this.surfaceVariantColor, 0.0], [this.isPlaying ? this.secondaryContainerColor : this.surfaceVariantColor, 1.0]]
@@ -340,7 +343,7 @@ export struct CameraGridCard {
       }
       .width('100%')
       .aspectRatio(1.55)
-      .borderRadius(14)
+      .borderRadius({ topLeft: 12, topRight: 12 })
       .clip(true)
 
       Row() {
@@ -362,9 +365,14 @@ export struct CameraGridCard {
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
       .alignItems(VerticalAlign.Center)
-      .margin({ top: 8 })
+      .padding({ left: 12, right: 12 })
+      .margin({ top: 10, bottom: 12 })
     }
     .width('100%')
+    .backgroundColor(this.surfaceColor)
+    .borderRadius(12)
+    .border({ width: 1, color: this.outlineVariantColor })
+    .shadow({ radius: 8, color: '#1A000000', offsetX: 0, offsetY: 2 })
     .onClick(() => this.onCardClick())
     .gesture(
       LongPressGesture()
@@ -417,7 +425,7 @@ export struct PlaybackFullscreenScreen {
   onSwipeRight: () => void = () => {};
   onPtzCommand: (command: string) => void = () => {};
   showPtzControls: boolean = false;
-  @State controlsVisible: boolean = true;
+  @State controlsVisible: boolean = false;
   @State zoomScale: number = 1.0;
   @State showPtzPad: boolean = false;
   @Prop videoWidth: number = 0;
@@ -545,19 +553,6 @@ export struct PlaybackFullscreenScreen {
           })
 
           Stack() {
-            if (!this.isPlaying) {
-              Stack() {
-                Circle({ width: 80, height: 80 })
-                  .fill(this.accentColor)
-                Text('▶')
-                  .fontSize(32)
-                  .fontColor(this.onPrimaryColor)
-              }
-              .width(80)
-              .height(80)
-              .onClick(() => this.onTogglePlayPause())
-            }
-
             // PTZ control pad
             if (this.showPtzPad || this.showPtzControls) {
               Column() {
@@ -622,46 +617,59 @@ export struct PlaybackFullscreenScreen {
           .layoutWeight(1)
 
           Row() {
-            Row({ space: 14 }) {
+            Row() {
               Text('📷')
-                .fontSize(22)
+                .fontSize(20)
                 .fontColor('#FFFFFFB3')
-                .width(44)
-                .height(44)
+                .width(40)
+                .height(40)
                 .textAlign(TextAlign.Center)
                 .onClick(() => this.onSnapshot())
 
-              Text(this.isRecording ? '●' : '○')
-                .fontSize(22)
-                .fontColor(this.errorColor)
-                .width(44)
-                .height(44)
-                .textAlign(TextAlign.Center)
+              SymbolGlyph($r('sys.symbol.record_circle'))
+                .fontSize(20)
+                .fontColor([this.errorColor])
+                .width(40)
+                .height(40)
                 .onClick(() => this.onToggleRecord())
 
+              Stack() {
+                Circle({ width: 56, height: 56 })
+                  .fill(this.accentColor)
+                Text(this.isPlaying ? '⏸' : '▶')
+                  .fontSize(26)
+                  .fontColor('#FFFFFF')
+                  .fontWeight(FontWeight.Bold)
+              }
+              .width(56)
+              .height(56)
+              .onClick(() => this.onTogglePlayPause())
+
               Text(this.isMuted ? '🔇' : '🔊')
-                .fontSize(22)
+                .fontSize(20)
                 .fontColor('#FFFFFFB3')
-                .width(44)
-                .height(44)
+                .width(40)
+                .height(40)
                 .textAlign(TextAlign.Center)
                 .onClick(() => this.onMute())
-            }
-            .alignItems(VerticalAlign.Center)
 
-            Text('⋮')
-              .fontSize(22)
-              .fontColor('#FFFFFF')
-              .width(44)
-              .height(44)
-              .textAlign(TextAlign.Center)
-              .border({ width: 2, color: '#FFFFFF', radius: 22 })
-              .onClick(() => this.onMore())
+              Text('⋮')
+                .fontSize(20)
+                .fontColor('#FFFFFF')
+                .width(40)
+                .height(40)
+                .textAlign(TextAlign.Center)
+                .border({ width: 2, color: '#FFFFFF', radius: 20 })
+                .onClick(() => this.onMore())
+            }
+            .width('50%')
+            .justifyContent(FlexAlign.SpaceEvenly)
+            .alignItems(VerticalAlign.Center)
           }
           .width('100%')
-          .justifyContent(FlexAlign.SpaceBetween)
+          .justifyContent(FlexAlign.Center)
           .alignItems(VerticalAlign.Center)
-          .padding({ left: 20, right: 20, top: 14, bottom: 14 })
+          .padding({ top: 10, bottom: 6 })
           .linearGradient({
             direction: GradientDirection.Top,
             colors: [['#00000000', 0.0], ['#CC000000', 1.0]]

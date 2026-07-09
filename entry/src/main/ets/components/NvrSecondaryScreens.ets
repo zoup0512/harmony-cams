@@ -408,6 +408,7 @@ export struct SettingsHomeScreen {
   onBgPlaybackChange: (enabled: boolean) => void = () => {};
   appLockEnabled: boolean = false;
   onAppLockChange: (enabled: boolean) => void = () => {};
+  onSelectStoragePath: () => void = () => {};
 
   build(): void {
     Column() {
@@ -485,6 +486,7 @@ export struct SettingsHomeScreen {
             .backgroundColor(this.surfaceVariantColor)
             .padding({ left: 14, right: 14, top: 12, bottom: 12 })
             .margin({ top: 6 })
+            .onClick(() => this.onSelectStoragePath())
           }
           .width('100%')
           .padding({ left: 16, right: 16, top: 10, bottom: 10 })
@@ -684,7 +686,7 @@ export struct SettingsHomeScreen {
       .width('100%')
       .padding({ left: 20, right: 20, bottom: 120 })
       .backgroundColor(this.bgColor)
-    }
+  }
 
   @Builder
   SettingsTextField(label: Resource, hint: Resource, value: string, onChange: (v: string) => void, password: boolean) {

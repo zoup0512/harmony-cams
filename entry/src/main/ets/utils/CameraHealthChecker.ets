@@ -33,11 +33,13 @@ export async function checkCameraReachable(camera: CameraDevice, timeoutMs: numb
   }
 
   let resolvedIp = host;
+  let addrFamily: number = 1;
   if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) {
     try {
       const addresses = await connection.getAddressesByName(host);
       if (addresses && addresses.length > 0) {
         resolvedIp = addresses[0].address;
+        addrFamily = addresses[0].family ?? 1;
       } else {
         return { reachable: false, latencyMs: 0, error: context ? rstr(context, 'health_dns_failed', host) : `DNS resolution failed: ${host}` };
       }
@@ -53,10 +55,11 @@ export async function checkCameraReachable(camera: CameraDevice, timeoutMs: numb
   let timerId: number = -1;
 
   try {
-    await tcpSocket.bind({ address: '0.0.0.0', port: 0, family: 1 });
+    const bindAddr = addrFamily === 2 ? '::' : '0.0.0.0';
+    await tcpSocket.bind({ address: bindAddr, port: 0, family: addrFamily });
 
     const connectPromise = tcpSocket.connect({
-      address: { address: resolvedIp, port: port, family: 1 },
+      address: { address: resolvedIp, port: port, family: addrFamily },
       timeout: timeoutMs,
     });
 

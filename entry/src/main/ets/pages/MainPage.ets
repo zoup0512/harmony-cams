@@ -1,6 +1,6 @@
 import { common, ConfigurationConstant } from '@kit.AbilityKit';
 import { promptAction, window } from '@kit.ArkUI';
-import { CameraDevice } from '../model/CameraDevice';
+import { CameraDevice, cloneCameraDevice } from '../model/CameraDevice';
 import { RecordingFile } from '../model/RecordingFile';
 import { NvrViewModel } from '../viewmodel/NvrViewModel';
 import { DeviceFlowStep, VerificationPreview, PlaybackStreamType, sanitizePlaybackUrl, buildPlaybackUrl, defaultPlaybackPort, playbackStreamTypeFromScheme, enrichCameraRtspUrl, cameraBadge, snapshotCameraKey } from '../utils/PlaybackModels';
@@ -94,6 +94,8 @@ struct MainPage {
   @State isAppLocked: boolean = false;
   @State pinInput: string = '';
   @State isInitializing: boolean = true;
+  @State showStoragePathDialog: boolean = false;
+  @State tempStoragePath: string = '';
   private pollTimerId: number = -1;
   private controlsTimerId: number = -1;
   private videoPollTimerId: number = -1;
@@ -231,8 +233,8 @@ struct MainPage {
   private syncState(): void {
     if (!this.vm) return;
     this.uiState = copyUiState(this.vm.uiState);
-    this.cameras = [...this.vm.cameras];
-    this.filteredCameras = [...this.vm.filteredCameras];
+    this.cameras = this.vm.cameras.map(cloneCameraDevice);
+    this.filteredCameras = this.vm.filteredCameras.map(cloneCameraDevice);
     const coversCount = this.cameras.filter(c => c.coverImagePath).length;
     console.info(`MainPage syncState: cameras=${this.cameras.length}, camerasWithCover=${coversCount}`);
     for (const c of this.cameras) {
@@ -405,6 +407,10 @@ struct MainPage {
                         this.vm?.setAppLock(false).then(() => this.syncState());
                       }
                     },
+                    onSelectStoragePath: () => {
+                      this.tempStoragePath = this.uiState.settings.storagePathInput;
+                      this.showStoragePathDialog = true;
+                    },
                   })
                 }
               }
@@ -500,6 +506,62 @@ struct MainPage {
         .alignItems(HorizontalAlign.Center)
         .backgroundColor('#99000000')
         .onClick(() => { this.vm?.onPendingDeleteSnapshotChange(null); this.syncState(); })
+      }
+
+      if (this.showStoragePathDialog) {
+        Column() {
+          Column() {
+            Text($r('app.string.dialog_storage_path_title'))
+              .fontSize(18)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.colors.onSurface)
+              .padding({ top: 24, left: 24, right: 24 })
+
+            TextInput({ text: this.tempStoragePath, placeholder: $r('app.string.storage_path_input_hint') })
+              .fontSize(14)
+              .fontColor(this.colors.onSurface)
+              .backgroundColor(this.colors.surfaceVariant)
+              .borderRadius(12)
+              .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+              .width('100%')
+              .margin({ top: 16, left: 24, right: 24 })
+              .onChange((v: string) => { this.tempStoragePath = v; })
+
+            Row() {
+              Text($r('app.string.dialog_cancel'))
+                .fontSize(16)
+                .fontColor(this.colors.onSurfaceVariant)
+                .layoutWeight(1)
+                .textAlign(TextAlign.Center)
+                .padding({ top: 16, bottom: 16 })
+                .onClick(() => { this.showStoragePathDialog = false; })
+
+              Text($r('app.string.dialog_confirm'))
+                .fontSize(16)
+                .fontColor(this.colors.primary)
+                .fontWeight(FontWeight.Bold)
+                .layoutWeight(1)
+                .textAlign(TextAlign.Center)
+                .padding({ top: 16, bottom: 16 })
+                .onClick(() => {
+                  this.showStoragePathDialog = false;
+                  this.vm?.onStoragePathChange(this.tempStoragePath);
+                  this.syncState();
+                })
+            }
+            .width('100%')
+            .margin({ top: 24 })
+          }
+          .width('80%')
+          .borderRadius(20)
+          .backgroundColor(this.colors.surface)
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .backgroundColor('#99000000')
+        .onClick(() => { this.showStoragePathDialog = false; })
       }
     }
     .width('100%')

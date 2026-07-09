@@ -122,7 +122,16 @@ export class NvrViewModel {
   }
 
   async reloadCameras(): Promise<void> {
+    const previousCameras = this.cameras;
     this.cameras = await this.dbHelper.getAllCameras();
+    for (const cam of this.cameras) {
+      const prev = previousCameras.find(p => p.id === cam.id);
+      if (prev) {
+        cam.isConnected = prev.isConnected;
+        cam.connectionQuality = prev.connectionQuality;
+        cam.lastSeen = prev.lastSeen;
+      }
+    }
     console.info(`reloadCameras: loaded ${this.cameras.length} cameras from DB`);
     await this.loadCameraCoverImages();
     this.updateFilteredCameras();
@@ -200,11 +209,15 @@ export class NvrViewModel {
     }
     this.healthCheckRunning = true;
     try {
+      const playingCameraId = this.uiState.playback.playingCameraId;
       const camerasToCheck = this.cameras.filter(c => c.rtspUrl && c.rtspUrl.trim() !== '');
       for (const camera of camerasToCheck) {
         if (camera.rtspUrl === '') {
           camera.isConnected = false;
           camera.connectionQuality = 'unknown';
+          continue;
+        }
+        if (camera.id === playingCameraId) {
           continue;
         }
         try {
@@ -409,8 +422,9 @@ export class NvrViewModel {
     console.info(`NvrViewModel startPlayback: success, playerState=${player.state}, url=${cameraToPlay.rtspUrl}`);
     this.uiState.playback.playingCameraId = cameraToPlay.id;
     this.uiState.playback.lastRequestedPlaybackCameraId = cameraToPlay.id;
+    cameraToPlay.isConnected = true;
+    cameraToPlay.lastSeen = Date.now();
     this.streamManager.setVolume(this.uiState.playback.lastNonZeroVolume);
-    safeShowToast(rstr(this.context, 'toast_playback_started'));
   }
 
   async saveSnapshot(cameraId: string, cameraName: string): Promise<boolean> {

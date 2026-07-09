@@ -69,6 +69,8 @@
     { "name": "dialog_close", "value": "关闭" },
     { "name": "dialog_delete", "value": "删除" },
     { "name": "dialog_cancel", "value": "取消" },
+    { "name": "dialog_confirm", "value": "确定" },
+    { "name": "dialog_storage_path_title", "value": "存储路径" },
     { "name": "dialog_delete_snapshot_title", "value": "删除快照" },
     { "name": "ad_hoc_playback_name", "value": "临时播放" },
     { "name": "unknown_camera_name", "value": "unknown" },
@@ -112,7 +114,7 @@
     { "name": "status_running", "value": "运行中" },
     { "name": "status_standby_btn", "value": "待启动" },
     { "name": "status_live", "value": "直播" },
-    { "name": "status_standby", "value": "待机" },
+    { "name": "status_standby", "value": "在线" },
     { "name": "status_offline", "value": "离线" },
     { "name": "badge_rec", "value": "录制" },
     { "name": "badge_cam", "value": "摄像机" },
@@ -268,6 +270,8 @@
     { "name": "diag_rtsp_timeout", "value": "RTSP连接超时" },
     { "name": "diag_rtsp_loading", "value": "正在加载RTSP流..." },
     { "name": "diag_rtsp_load_complete", "value": "RTSP流加载完成" },
+    { "name": "storage_path_input_hint", "value": "请输入存储路径" },
+
     { "name": "diag_rtsp_playing", "value": "RTSP流已开始播放" },
 
     { "name": "diag_rtsp_startup_exception", "value": "RTSP启动异常: %s" },
