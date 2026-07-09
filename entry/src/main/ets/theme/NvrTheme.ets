@@ -21,6 +21,7 @@ export interface NvrColors {
   outlineVariant: string;
   error: string;
   secondaryContainer: string;
+  placeholderColor: string;
 }
 
 export function buildLightColors(): NvrColors {
@@ -41,6 +42,7 @@ export function buildLightColors(): NvrColors {
     outlineVariant: '#E8E9ED',
     error: '#E53935',
     secondaryContainer: '#D6F3E8',
+    placeholderColor: '#A8ACB3',
   };
 }
 
@@ -62,6 +64,7 @@ export function buildDarkColors(): NvrColors {
     outlineVariant: '#2D3035',
     error: '#EF5350',
     secondaryContainer: '#1A3D31',
+    placeholderColor: '#5A5F66',
   };
 }
 

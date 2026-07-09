@@ -404,7 +404,8 @@ export struct SettingsHomeScreen {
   onClearRecordings: () => void = () => {};
   onManageRtmpSettings: () => void = () => {};
   @State showPassword: boolean = false;
-  @State bgPlaybackEnabled: boolean = false;
+  @Prop bgPlaybackEnabled: boolean = false;
+  onBgPlaybackChange: (enabled: boolean) => void = () => {};
   appLockEnabled: boolean = false;
   onAppLockChange: (enabled: boolean) => void = () => {};
 
@@ -552,7 +553,7 @@ export struct SettingsHomeScreen {
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
           Toggle({ type: ToggleType.Switch, isOn: this.bgPlaybackEnabled })
-            .onChange((v: boolean) => { this.bgPlaybackEnabled = v; })
+            .onChange((v: boolean) => { this.onBgPlaybackChange(v); })
         }
         .width('100%')
         .borderRadius(20)

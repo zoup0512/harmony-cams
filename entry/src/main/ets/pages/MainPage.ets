@@ -70,6 +70,7 @@ struct MainPage {
       rtmpAudioEnabled: true,
       rtmpAutoStreamEnabled: false,
       appearanceThemeMode: 'light',
+      bgPlaybackEnabled: false,
     },
   };
   @State cameras: CameraDevice[] = [];
@@ -135,15 +136,14 @@ struct MainPage {
     if (this.vm && this.uiState.playback.playingCameraId) {
       this.restoreOrientation();
       const cameraId = this.uiState.playback.playingCameraId;
-      this.vm.prefs.getBoolean('allow_background_playback', false).then((allowed: boolean) => {
-        if (!allowed && this.isPageHidden) {
-          this.vm!.saveExitCoverImage(cameraId ?? '').then(() => {
-            if (this.isPageHidden) {
-              this.vm!.clearPlaybackState().then(() => this.syncState());
-            }
-          });
-        }
-      });
+      const allowed = this.uiState.settings.bgPlaybackEnabled;
+      if (!allowed && this.isPageHidden) {
+        this.vm!.saveExitCoverImage(cameraId ?? '').then(() => {
+          if (this.isPageHidden) {
+            this.vm!.clearPlaybackState().then(() => this.syncState());
+          }
+        });
+      }
     }
     if (this.vm) {
       this.vm.lockApp();
@@ -375,6 +375,7 @@ struct MainPage {
                     rtmpPasswordInput: this.uiState.settings.rtmpPasswordInput,
                     rtmpAudioEnabled: this.uiState.settings.rtmpAudioEnabled,
                     rtmpAutoStreamEnabled: this.uiState.settings.rtmpAutoStreamEnabled,
+                    bgPlaybackEnabled: this.uiState.settings.bgPlaybackEnabled,
                     bgColor: this.colors.background,
                     surfaceColor: this.colors.surface,
                     surfaceVariantColor: this.colors.surfaceVariant,
@@ -393,6 +394,7 @@ struct MainPage {
                     onRtmpPasswordChange: (v: string) => { this.vm?.onRtmpPasswordChange(v); this.syncState(); },
                     onRtmpAudioEnabledChange: (v: boolean) => { this.vm?.onRtmpAudioEnabledChange(v); this.syncState(); },
                     onRtmpAutoStreamChange: (v: boolean) => { this.vm?.onRtmpAutoStreamChange(v); this.syncState(); },
+                    onBgPlaybackChange: (v: boolean) => { this.vm?.onBgPlaybackChange(v); this.syncState(); },
                     onClearRecordings: () => { this.vm?.clearRecordings(); this.syncState(); },
                     onManageRtmpSettings: () => safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_rtmp_configure_hint')),
                     appLockEnabled: this.uiState.appLockEnabled ?? false,
@@ -655,6 +657,7 @@ struct MainPage {
           surfaceColor: this.colors.surface,
           onSurfaceColor: this.colors.onSurface,
           onSurfaceVariantColor: this.colors.onSurfaceVariant,
+          placeholderColor: this.colors.placeholderColor,
           accentColor: this.colors.primary,
           onPrimaryColor: this.colors.onPrimary,
           primaryColor: this.colors.primary,
@@ -674,12 +677,12 @@ struct MainPage {
           manageLoginEnabled: this.uiState.deviceForm.manageLoginEnabled,
           manageUsername: this.uiState.deviceForm.manageUsername,
           managePassword: this.uiState.deviceForm.managePassword,
-          managePasswordVisible: this.uiState.deviceForm.managePasswordVisible,
           forceHttpSoftwareDecode: this.uiState.deviceForm.forceHttpSoftwareDecode,
           bgColor: this.colors.background,
           surfaceColor: this.colors.surface,
           onSurfaceColor: this.colors.onSurface,
           onSurfaceVariantColor: this.colors.onSurfaceVariant,
+          placeholderColor: this.colors.placeholderColor,
           accentColor: this.colors.primary,
           onPrimaryColor: this.colors.onPrimary,
           outlineVariantColor: this.colors.outlineVariant,
@@ -691,7 +694,6 @@ struct MainPage {
           onManageLoginEnabledChange: (v: boolean) => { this.vm?.onManageLoginEnabledChange(v); this.syncState(); },
           onManageUsernameChange: (v: string) => { this.vm?.onManageUsernameChange(v); this.syncState(); },
           onManagePasswordChange: (v: string) => { this.vm?.onManagePasswordChange(v); this.syncState(); },
-          onTogglePasswordVisible: () => { this.vm?.onManagePasswordVisibleChange(!this.uiState.deviceForm.managePasswordVisible); this.syncState(); },
           onForceHttpSoftwareDecodeChange: (v: boolean) => { this.vm?.onForceHttpSoftwareDecodeChange(v); this.syncState(); },
           onOpenVendorPicker: () => {
             this.vm?.onDeviceFlowStepChange(DeviceFlowStep.VendorPicker);

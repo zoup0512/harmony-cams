@@ -86,6 +86,7 @@ export class NvrViewModel {
         rtmpAudioEnabled: await this.prefs.getBoolean('rtmp_push_audio_enabled', true),
         rtmpAutoStreamEnabled: await this.prefs.getBoolean('rtmp_auto_stream', false),
         appearanceThemeMode: await this.prefs.getString('appearance_theme_mode', 'light'),
+        bgPlaybackEnabled: await this.prefs.getBoolean('allow_background_playback', false),
       };
 
     AppearanceThemeState.initFromPrefs(this.uiState.settings.appearanceThemeMode);
@@ -668,6 +669,11 @@ export class NvrViewModel {
   async onRtmpAutoStreamChange(v: boolean): Promise<void> {
     this.uiState.settings.rtmpAutoStreamEnabled = v;
     await this.prefs.putBoolean('rtmp_auto_stream', v);
+  }
+
+  async onBgPlaybackChange(v: boolean): Promise<void> {
+    this.uiState.settings.bgPlaybackEnabled = v;
+    await this.prefs.putBoolean('allow_background_playback', v);
   }
   async onAppearanceThemeModeChange(v: string): Promise<void> {
     this.uiState.settings.appearanceThemeMode = v;

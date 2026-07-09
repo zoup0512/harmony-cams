@@ -79,6 +79,7 @@ export interface NvrSettingsState {
   rtmpAudioEnabled: boolean;
   rtmpAutoStreamEnabled: boolean;
   appearanceThemeMode: string;
+  bgPlaybackEnabled: boolean;
 }
 
 export function defaultSettingsState(): NvrSettingsState {
@@ -93,6 +94,7 @@ export function defaultSettingsState(): NvrSettingsState {
     rtmpAudioEnabled: true,
     rtmpAutoStreamEnabled: false,
     appearanceThemeMode: 'light',
+    bgPlaybackEnabled: false,
   };
 }
 
@@ -158,6 +160,7 @@ export function copySettingsState(src: NvrSettingsState): NvrSettingsState {
     rtmpAudioEnabled: src.rtmpAudioEnabled,
     rtmpAutoStreamEnabled: src.rtmpAutoStreamEnabled,
     appearanceThemeMode: src.appearanceThemeMode,
+    bgPlaybackEnabled: src.bgPlaybackEnabled,
   };
 }
 

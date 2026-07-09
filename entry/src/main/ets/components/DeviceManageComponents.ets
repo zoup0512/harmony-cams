@@ -171,12 +171,12 @@ export struct AddCameraFormScreen {
   manageLoginEnabled: boolean = true;
   manageUsername: string = '';
   managePassword: string = '';
-  managePasswordVisible: boolean = false;
   forceHttpSoftwareDecode: boolean = false;
   bgColor: string = '#F7F8FA';
   surfaceColor: string = '#FFFFFF';
   onSurfaceColor: string = '#1B1B1D';
   onSurfaceVariantColor: string = '#6B6F76';
+  placeholderColor: string = '#9AA0A8';
   accentColor: string = '#20B486';
   onPrimaryColor: string = '#FFFFFF';
   outlineVariantColor: string = '#E0E2E8';
@@ -188,7 +188,6 @@ export struct AddCameraFormScreen {
   onManageLoginEnabledChange: (v: boolean) => void = () => {};
   onManageUsernameChange: (v: string) => void = () => {};
   onManagePasswordChange: (v: string) => void = () => {};
-  onTogglePasswordVisible: () => void = () => {};
   onForceHttpSoftwareDecodeChange: (v: boolean) => void = () => {};
   onOpenVendorPicker: () => void = () => {};
   onSave: () => void = () => {};
@@ -241,6 +240,7 @@ export struct AddCameraFormScreen {
               TextInput({ text: this.manageHost, placeholder: $r('app.string.host_placeholder') })
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
+                .placeholderColor(this.placeholderColor)
                 .textAlign(TextAlign.End)
                 .backgroundColor(Color.Transparent)
                 .layoutWeight(1)
@@ -280,6 +280,7 @@ export struct AddCameraFormScreen {
               TextInput({ text: this.manageUsername, placeholder: 'admin' })
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
+                .placeholderColor(this.placeholderColor)
                 .textAlign(TextAlign.End)
                 .backgroundColor(Color.Transparent)
                 .layoutWeight(1)
@@ -295,29 +296,15 @@ export struct AddCameraFormScreen {
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
                 .width(96)
-              if (this.managePasswordVisible) {
-                TextInput({ text: this.managePassword, placeholder: $r('app.string.password') })
-                  .fontSize(16)
-                  .fontColor(this.onSurfaceColor)
-                  .textAlign(TextAlign.End)
-                  .backgroundColor(Color.Transparent)
-                  .layoutWeight(1)
-                  .onChange((v: string) => this.onManagePasswordChange(v))
-              } else {
-                TextInput({ text: this.managePassword, placeholder: $r('app.string.password') })
-                  .fontSize(16)
-                  .fontColor(this.onSurfaceColor)
-                  .textAlign(TextAlign.End)
-                  .backgroundColor(Color.Transparent)
-                  .layoutWeight(1)
-                  .type(InputType.Password)
-                  .onChange((v: string) => this.onManagePasswordChange(v))
-              }
-              Text('👁')
-                .fontSize(18)
-                .fontColor(this.accentColor)
-                .margin({ left: 8 })
-                .onClick(() => this.onTogglePasswordVisible())
+              TextInput({ text: this.managePassword, placeholder: $r('app.string.password') })
+                .fontSize(16)
+                .fontColor(this.onSurfaceColor)
+                .placeholderColor(this.placeholderColor)
+                .textAlign(TextAlign.End)
+                .backgroundColor(Color.Transparent)
+                .layoutWeight(1)
+                .type(InputType.Password)
+                .onChange((v: string) => this.onManagePasswordChange(v))
             }
             .width('100%')
             .padding({ top: 8, bottom: 8 })
@@ -419,6 +406,7 @@ export struct AddCameraFormScreen {
                 TextInput({ text: this.managePort, placeholder: defaultPlaybackPort(this.getSelectedScheme()) })
                   .fontSize(16)
                   .fontColor(this.onSurfaceColor)
+                  .placeholderColor(this.placeholderColor)
                   .textAlign(TextAlign.End)
                   .backgroundColor(Color.Transparent)
                   .layoutWeight(1)
@@ -438,6 +426,7 @@ export struct AddCameraFormScreen {
                 TextInput({ text: this.manageStreamPath, placeholder: 'stream1' })
                   .fontSize(16)
                   .fontColor(this.onSurfaceColor)
+                  .placeholderColor(this.placeholderColor)
                   .textAlign(TextAlign.End)
                   .backgroundColor(Color.Transparent)
                   .layoutWeight(1)
@@ -522,6 +511,7 @@ export struct AddCameraVerificationScreen {
   surfaceColor: string = '#FFFFFF';
   onSurfaceColor: string = '#1B1B1D';
   onSurfaceVariantColor: string = '#6B6F76';
+  placeholderColor: string = '#9AA0A8';
   accentColor: string = '#20B486';
   onPrimaryColor: string = '#FFFFFF';
   primaryColor: string = '#20B486';
@@ -618,6 +608,7 @@ export struct AddCameraVerificationScreen {
               TextInput({ text: this.manageName, placeholder: $r('app.string.camera_name') })
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
+                .placeholderColor(this.placeholderColor)
                 .textAlign(TextAlign.End)
                 .backgroundColor(Color.Transparent)
                 .layoutWeight(1)
