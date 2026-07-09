@@ -1,5 +1,6 @@
 import { common, ConfigurationConstant } from '@kit.AbilityKit';
 import { promptAction, window } from '@kit.ArkUI';
+import { picker } from '@kit.CoreFileKit';
 import { CameraDevice, cloneCameraDevice } from '../model/CameraDevice';
 import { RecordingFile } from '../model/RecordingFile';
 import { NvrViewModel } from '../viewmodel/NvrViewModel';
@@ -94,8 +95,6 @@ struct MainPage {
   @State isAppLocked: boolean = false;
   @State pinInput: string = '';
   @State isInitializing: boolean = true;
-  @State showStoragePathDialog: boolean = false;
-  @State tempStoragePath: string = '';
   private pollTimerId: number = -1;
   private controlsTimerId: number = -1;
   private videoPollTimerId: number = -1;
@@ -410,8 +409,23 @@ struct MainPage {
                       }
                     },
                     onSelectStoragePath: () => {
-                      this.tempStoragePath = this.uiState.settings.storagePathInput;
-                      this.showStoragePathDialog = true;
+                      const documentPicker = new picker.DocumentViewPicker();
+                      const options = new picker.DocumentSelectOptions();
+                      options.maxSelectNumber = 1;
+                      documentPicker.select(options).then((uris: string[]) => {
+                        if (uris && uris.length > 0) {
+                          const uri = uris[0];
+                          const pathPart = uri.replace(/^file:\/\//, '');
+                          const slashIdx = pathPart.lastIndexOf('/');
+                          if (slashIdx > 0) {
+                            const dirPath = pathPart.substring(0, slashIdx);
+                            this.vm?.onStoragePathChange(dirPath);
+                            this.syncState();
+                          }
+                        }
+                      }).catch((e: Error) => {
+                        console.error(`StoragePathPicker: select failed: ${e.message}`);
+                      });
                     },
                   })
                 }
@@ -508,62 +522,6 @@ struct MainPage {
         .alignItems(HorizontalAlign.Center)
         .backgroundColor('#99000000')
         .onClick(() => { this.vm?.onPendingDeleteSnapshotChange(null); this.syncState(); })
-      }
-
-      if (this.showStoragePathDialog) {
-        Column() {
-          Column() {
-            Text($r('app.string.dialog_storage_path_title'))
-              .fontSize(18)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(this.colors.onSurface)
-              .padding({ top: 24, left: 24, right: 24 })
-
-            TextInput({ text: this.tempStoragePath, placeholder: $r('app.string.storage_path_input_hint') })
-              .fontSize(14)
-              .fontColor(this.colors.onSurface)
-              .backgroundColor(this.colors.surfaceVariant)
-              .borderRadius(12)
-              .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-              .width('100%')
-              .margin({ top: 16, left: 24, right: 24 })
-              .onChange((v: string) => { this.tempStoragePath = v; })
-
-            Row() {
-              Text($r('app.string.dialog_cancel'))
-                .fontSize(16)
-                .fontColor(this.colors.onSurfaceVariant)
-                .layoutWeight(1)
-                .textAlign(TextAlign.Center)
-                .padding({ top: 16, bottom: 16 })
-                .onClick(() => { this.showStoragePathDialog = false; })
-
-              Text($r('app.string.dialog_confirm'))
-                .fontSize(16)
-                .fontColor(this.colors.primary)
-                .fontWeight(FontWeight.Bold)
-                .layoutWeight(1)
-                .textAlign(TextAlign.Center)
-                .padding({ top: 16, bottom: 16 })
-                .onClick(() => {
-                  this.showStoragePathDialog = false;
-                  this.vm?.onStoragePathChange(this.tempStoragePath);
-                  this.syncState();
-                })
-            }
-            .width('100%')
-            .margin({ top: 24 })
-          }
-          .width('80%')
-          .borderRadius(20)
-          .backgroundColor(this.colors.surface)
-        }
-        .width('100%')
-        .height('100%')
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
-        .backgroundColor('#99000000')
-        .onClick(() => { this.showStoragePathDialog = false; })
       }
     }
     .width('100%')

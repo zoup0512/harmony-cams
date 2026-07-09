@@ -77,7 +77,7 @@
     { "name": "theme_dark", "value": "Dark" },
     { "name": "section_device_options", "value": "Device Options" },
     { "name": "settings_storage_path", "value": "Storage Path" },
-    { "name": "storage_path_hint", "value": "Tap to select storage directory" },
+    { "name": "storage_path_hint", "value": "Select a file, its directory will be used as storage path" },
     { "name": "settings_recording_quality", "value": "Recording Quality" },
     { "name": "settings_recording_duration", "value": "Recording Duration" },
     { "name": "duration_hint", "value": "Minutes, e.g. 30" },
@@ -329,6 +329,10 @@
     { "name": "health_dns_failed", "value": "DNS resolution failed: %s" },
     { "name": "health_dns_error", "value": "DNS resolution error: %s" },
     { "name": "health_timeout", "value": "Connection timeout (%dms)" },
-    { "name": "health_not_connected", "value": "Connection not established" }
+    { "name": "health_not_connected", "value": "Connection not established" },
+    { "name": "dialog_browse_path_title", "value": "Select Storage Directory" },
+    { "name": "browse_parent_dir", "value": "Parent Directory" },
+    { "name": "browse_select_current", "value": "Select This Directory" },
+    { "name": "browse_empty", "value": "No subdirectories" }
   ]
 }
