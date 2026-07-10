@@ -472,7 +472,17 @@ export struct PlaybackFullscreenScreen {
       .backgroundColor('#000000')
       .justifyContent(FlexAlign.Center)
       .gesture(
-        SwipeGesture({ speed: 0.3 })
+        TapGesture({ count: 2 })
+          .onAction(() => {
+            if (this.zoomScale > 1.0) {
+              this.zoomScale = 1.0;
+            } else {
+              this.zoomScale = 2.0;
+            }
+          })
+      )
+      .gesture(
+        SwipeGesture({ speed: 100 })
           .onAction((event: GestureEvent) => {
             if (event.angle > -45 && event.angle < 45) {
               this.onSwipeLeft();
@@ -488,16 +498,6 @@ export struct PlaybackFullscreenScreen {
               this.zoomScale = Math.min(this.zoomScale * 1.3, 3.0);
             } else {
               this.zoomScale = Math.max(this.zoomScale / 1.3, 1.0);
-            }
-          })
-      )
-      .gesture(
-        TapGesture({ count: 2 })
-          .onAction(() => {
-            if (this.zoomScale > 1.0) {
-              this.zoomScale = 1.0;
-            } else {
-              this.zoomScale = 2.0;
             }
           })
       )
@@ -665,12 +665,12 @@ export struct PlaybackFullscreenScreen {
             }
             .width('50%')
             .justifyContent(FlexAlign.SpaceEvenly)
-            .alignItems(VerticalAlign.Center)
+            .alignItems(VerticalAlign.Bottom)
           }
           .width('100%')
           .justifyContent(FlexAlign.Center)
-          .alignItems(VerticalAlign.Center)
-          .padding({ top: 10, bottom: 6 })
+          .alignItems(VerticalAlign.Bottom)
+          .padding({ top: 10, bottom: 0 })
           .linearGradient({
             direction: GradientDirection.Top,
             colors: [['#00000000', 0.0], ['#CC000000', 1.0]]
