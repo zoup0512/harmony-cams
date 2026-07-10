@@ -9,7 +9,7 @@ import { DatabaseHelper } from '../utils/DatabaseHelper';
 import { StorageManager } from '../utils/StorageManager';
 import { VideoStreamManager } from '../utils/VideoStreamManager';
 import { PrefStore } from '../utils/PrefStore';
-import { loadStreamConfig } from '../utils/StreamConfig';
+import { loadStreamConfig, StreamDefaultConfig } from '../utils/StreamConfig';
 import {
   DeviceFlowStep, VerificationPreview, PlaybackStreamType,
   buildPlaybackUrl, defaultPlaybackPort, parsePlaybackUrl, sanitizePlaybackUrl,
@@ -70,43 +70,70 @@ export class NvrViewModel {
 
     const streamConfig = await loadStreamConfig(this.context);
 
-    const savedStoragePath = await this.prefs.getString('storage_path', '');
+    const prefResults = await Promise.all([
+      this.prefs.getString('storage_path', ''),
+      this.prefs.getString('recording_quality', '1080p'),
+      this.prefs.getString('recording_duration', '30'),
+      this.prefs.getString('rtmp_push_url', streamConfig.rtmp.url),
+      this.prefs.getString('rtmp_push_stream_key', streamConfig.rtmp.streamKey),
+      this.prefs.getString('rtmp_push_username', streamConfig.rtmp.username),
+      this.prefs.getString('rtmp_push_password', streamConfig.rtmp.password),
+      this.prefs.getBoolean('rtmp_push_audio_enabled', true),
+      this.prefs.getBoolean('rtmp_auto_stream', false),
+      this.prefs.getString('appearance_theme_mode', 'light'),
+      this.prefs.getBoolean('allow_background_playback', false),
+      this.prefs.getBoolean('app_lock_enabled', false),
+      this.prefs.getNumber('grid_columns', 1),
+    ]);
+    const savedStoragePath = prefResults[0] as string;
+    const recordingQuality = prefResults[1] as string;
+    const recordingDuration = prefResults[2] as string;
+    const rtmpUrl = prefResults[3] as string;
+    const rtmpStreamKey = prefResults[4] as string;
+    const rtmpUsername = prefResults[5] as string;
+    const rtmpPassword = prefResults[6] as string;
+    const rtmpAudioEnabled = prefResults[7] as boolean;
+    const rtmpAutoStreamEnabled = prefResults[8] as boolean;
+    const appearanceThemeMode = prefResults[9] as string;
+    const bgPlaybackEnabled = prefResults[10] as boolean;
+    const appLockEnabled = prefResults[11] as boolean;
+    const gridColumns = prefResults[12] as number;
+
     const initialStorage = savedStoragePath && savedStoragePath.trim() !== '' && savedStoragePath !== '/sdcard/NVR'
       ? savedStoragePath
       : this.context.filesDir;
 
     this.uiState.settings = {
         storagePathInput: initialStorage,
-        recordingQualityInput: await this.prefs.getString('recording_quality', '1080p'),
-        recordingDurationInput: await this.prefs.getString('recording_duration', '30'),
-        rtmpUrlInput: await this.prefs.getString('rtmp_push_url', streamConfig.rtmp.url),
-        rtmpStreamKeyInput: await this.prefs.getString('rtmp_push_stream_key', streamConfig.rtmp.streamKey),
-        rtmpUsernameInput: await this.prefs.getString('rtmp_push_username', streamConfig.rtmp.username),
-        rtmpPasswordInput: await this.prefs.getString('rtmp_push_password', streamConfig.rtmp.password),
-        rtmpAudioEnabled: await this.prefs.getBoolean('rtmp_push_audio_enabled', true),
-        rtmpAutoStreamEnabled: await this.prefs.getBoolean('rtmp_auto_stream', false),
-        appearanceThemeMode: await this.prefs.getString('appearance_theme_mode', 'light'),
-        bgPlaybackEnabled: await this.prefs.getBoolean('allow_background_playback', false),
+        recordingQualityInput: recordingQuality,
+        recordingDurationInput: recordingDuration,
+        rtmpUrlInput: rtmpUrl,
+        rtmpStreamKeyInput: rtmpStreamKey,
+        rtmpUsernameInput: rtmpUsername,
+        rtmpPasswordInput: rtmpPassword,
+        rtmpAudioEnabled: rtmpAudioEnabled,
+        rtmpAutoStreamEnabled: rtmpAutoStreamEnabled,
+        appearanceThemeMode: appearanceThemeMode,
+        bgPlaybackEnabled: bgPlaybackEnabled,
       };
 
-    AppearanceThemeState.initFromPrefs(this.uiState.settings.appearanceThemeMode);
+    AppearanceThemeState.initFromPrefs(appearanceThemeMode);
 
-    this.uiState.appLockEnabled = await this.prefs.getBoolean('app_lock_enabled', false);
-    this.uiState.isAppLocked = this.uiState.appLockEnabled;
-    this.uiState.gridColumns = await this.prefs.getNumber('grid_columns', 1);
+    this.uiState.appLockEnabled = appLockEnabled;
+    this.uiState.isAppLocked = appLockEnabled;
+    this.uiState.gridColumns = gridColumns;
 
-    await this.addDefaultCameraIfNeeded();
+    await this.addDefaultCameraIfNeeded(streamConfig);
     await this.reloadCameras();
-    await this.reloadRecordings();
-    await this.reloadSnapshots();
-    await this.checkCameraHealth();
+    this.reloadRecordings();
+    this.reloadSnapshots();
   }
 
-  private async addDefaultCameraIfNeeded(): Promise<void> {
+  private async addDefaultCameraIfNeeded(streamConfig?: StreamDefaultConfig): Promise<void> {
     try {
-      const streamConfig = await loadStreamConfig(this.context);
-      const hlsUrl = streamConfig.hls.url;
-      const hlsName = streamConfig.hls.name;
+      const config = streamConfig ?? await loadStreamConfig(this.context);
+      const hlsUrl = config.hls.url;
+      const hlsName = config.hls.name;
       const cameras = await this.dbHelper.getAllCameras();
       console.info(`addDefaultCameraIfNeeded: existing cameras=${cameras.length}, hlsUrl=${hlsUrl}`);
       const exists = cameras.some(c => c.rtspUrl === hlsUrl);
@@ -333,9 +360,11 @@ export class NvrViewModel {
 
   async loadCameraCoverImages(): Promise<void> {
     console.info(`NvrViewModel loadCameraCoverImages: BEGIN, cameraCount=${this.cameras.length}`);
-    for (const camera of this.cameras) {
-      const prefKey = `camera_cover_${camera.id}`;
-      const path = await this.prefs.getString(prefKey, '');
+    const paths = await Promise.all(
+      this.cameras.map(c => this.prefs.getString(`camera_cover_${c.id}`, ''))
+    );
+    for (let i = 0; i < this.cameras.length; i++) {
+      const path = paths[i];
       if (path !== '') {
         let fileExists = false;
         try {
@@ -344,15 +373,11 @@ export class NvrViewModel {
         } catch {
           fileExists = false;
         }
-        console.info(`NvrViewModel loadCameraCoverImages: cameraId='${camera.id}', name='${camera.name}', prefKey='${prefKey}', path='${path}', fileExists=${fileExists}`);
         if (fileExists) {
-          camera.coverImagePath = path;
+          this.cameras[i].coverImagePath = path;
         } else {
-          console.warn(`NvrViewModel loadCameraCoverImages: cover file does not exist, clearing path`);
-          camera.coverImagePath = undefined;
+          this.cameras[i].coverImagePath = undefined;
         }
-      } else {
-        console.info(`NvrViewModel loadCameraCoverImages: cameraId='${camera.id}', name='${camera.name}', no cover path in prefs`);
       }
     }
     const withCover = this.cameras.filter(c => c.coverImagePath).length;

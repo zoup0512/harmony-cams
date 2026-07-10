@@ -248,7 +248,7 @@ export struct CameraHomeScreen {
                 onLongPress: () => this.onCameraLongPress(device),
               })
             }
-          }, (device: CameraDevice) => device.id)
+          }, (device: CameraDevice) => `${device.id}_${device.isConnected}_${device.isRecording}`)
         }
         .columnsTemplate(this.gridColumns === 1 ? '1fr' : this.gridColumns === 2 ? '1fr 1fr' : '1fr 1fr 1fr')
         .layoutWeight(1)

@@ -158,6 +158,7 @@ struct MainPage {
     this.syncState();
     this.isInitializing = false;
     this.startPlaybackPolling();
+    this.vm.checkCameraHealth().then(() => this.syncState());
   }
 
   private startPlaybackPolling(): void {
