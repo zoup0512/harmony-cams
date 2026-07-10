@@ -302,17 +302,18 @@ export struct CameraGridCard {
         Row() {
           Circle({ width: 6, height: 6 })
             .fill(this.getStatusDotColor())
+            .margin({ right: 4 })
           Text(this.getStatusLabel())
             .fontSize(10)
             .fontColor('#FFFFFFEB')
             .fontWeight(FontWeight.Bold)
             .maxLines(1)
         }
-        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+        .padding({ left: 6, right: 8, top: 4, bottom: 4 })
         .backgroundColor('#6B000000')
         .borderRadius(999)
-        .align(Alignment.TopStart)
-        .margin({ left: 8, top: 8 })
+        .align(Alignment.BottomStart)
+        .margin({ left: 8, bottom: 8 })
 
         if (this.isPlaying) {
           Text($r('app.string.badge_rec'))
@@ -326,21 +327,6 @@ export struct CameraGridCard {
             .margin({ right: 8, top: 8 })
         }
 
-        // Connection quality indicator
-        if (this.camera.connectionQuality && this.camera.connectionQuality !== 'unknown') {
-          Row() {
-            ForEach([0, 1, 2], (idx: number) => {
-              Column()
-                .width(3)
-                .height(idx === 0 ? 4 : idx === 1 ? 7 : 10)
-                .backgroundColor(this.getQualityBarColor(idx))
-                .borderRadius(1)
-                .margin({ left: idx > 0 ? 1 : 0 })
-            })
-          }
-          .align(Alignment.BottomEnd)
-          .margin({ right: 8, bottom: 8 })
-        }
       }
       .width('100%')
       .aspectRatio(1.55)
@@ -393,13 +379,6 @@ export struct CameraGridCard {
     return this.onSurfaceVariantColor;
   }
 
-  private getQualityBarColor(idx: number): ResourceColor {
-    const quality = this.camera.connectionQuality ?? 'unknown';
-    if (quality === 'good') return this.accentColor;
-    if (quality === 'fair') return idx < 2 ? '#FFA726' : '#4DFFFFFF';
-    if (quality === 'poor') return idx === 0 ? this.errorColor : '#4DFFFFFF';
-    return '#4DFFFFFF';
-  }
 }
 
 @Component
