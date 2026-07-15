@@ -10,6 +10,7 @@ export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     hilog.info(DOMAIN, TAG, 'onCreate');
     AppStorage.setOrCreate('currentColorMode', ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT);
+    AppStorage.setOrCreate('isAppForeground', true);
   }
 
   onDestroy(): void {
@@ -34,10 +35,14 @@ export default class EntryAbility extends UIAbility {
 
   onForeground(): void {
     hilog.info(DOMAIN, TAG, 'onForeground');
+    console.info('EntryAbility onForeground: setting isAppForeground=true');
+    AppStorage.setOrCreate('isAppForeground', true);
   }
 
   onBackground(): void {
     hilog.info(DOMAIN, TAG, 'onBackground');
+    console.info('EntryAbility onBackground: setting isAppForeground=false');
+    AppStorage.setOrCreate('isAppForeground', false);
   }
 
   onConfigurationUpdate(newConfig: Configuration): void {

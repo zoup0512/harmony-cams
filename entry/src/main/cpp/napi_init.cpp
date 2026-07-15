@@ -72,6 +72,39 @@ static napi_value ReleaseEncoder(napi_env env, napi_callback_info info)
     return undefined;
 }
 
+static napi_value SetMotionDetection(napi_env env, napi_callback_info info)
+{
+    size_t argc = 2;
+    napi_value args[2];
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    bool enabled;
+    double threshold;
+    napi_get_value_bool(env, args[0], &enabled);
+    napi_get_value_double(env, args[1], &threshold);
+
+    if (g_encoder != nullptr) {
+        g_encoder->setMotionDetection(enabled, (float)threshold);
+    }
+    napi_value undefined;
+    napi_get_undefined(env, &undefined);
+    return undefined;
+}
+
+static napi_value SetMotionCallback(napi_env env, napi_callback_info info)
+{
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    if (g_encoder != nullptr) {
+        g_encoder->setMotionCallback(env, args[0]);
+    }
+    napi_value undefined;
+    napi_get_undefined(env, &undefined);
+    return undefined;
+}
+
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports)
 {
@@ -80,6 +113,8 @@ static napi_value Init(napi_env env, napi_value exports)
         { "startEncoder", nullptr, StartEncoder, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "stopEncoder", nullptr, StopEncoder, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "releaseEncoder", nullptr, ReleaseEncoder, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "setMotionDetection", nullptr, SetMotionDetection, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "setMotionCallback", nullptr, SetMotionCallback, nullptr, nullptr, nullptr, napi_default, nullptr },
     };
     napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
     return exports;

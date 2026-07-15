@@ -1,6 +1,6 @@
 import { RecordingFile, readableFileSize } from '../model/RecordingFile';
 import { buildPhoneRtspAddress } from '../utils/NetworkUtils';
-import { CameraStreamManager, StreamStatus } from '../utils/CameraStreamManager';
+import { CameraStreamManager, StreamStatus, MotionEventLog } from '../utils/CameraStreamManager';
 import { common } from '@kit.AbilityKit';
 
 interface ThemeOptionItem {
@@ -60,6 +60,11 @@ export struct ActivityStreamScreen {
   @State statusText: string = '';
   @State rtspAddress: string = buildPhoneRtspAddress();
   @State clientCount: number = 0;
+  @State motionEnabled: boolean = false;
+  @State motionDetected: boolean = false;
+  @State motionEvents: MotionEventLog[] = [];
+  @State motionSensitivity: number = 1;
+  @StorageLink('isAppForeground') @Watch('onAppForegroundChange') isAppForeground: boolean = true;
   private streamManager: CameraStreamManager | null = null;
   private xComponentController: XComponentController = new XComponentController();
   private previewSurfaceId: string = '';
@@ -86,13 +91,31 @@ export struct ActivityStreamScreen {
       this.isStreaming = status.isStreaming;
       this.statusText = status.statusText;
       this.clientCount = status.clientCount;
+      this.motionDetected = status.motionDetected;
+      this.motionEvents = status.motionEvents;
     });
+    console.info(`ActivityStreamScreen aboutToAppear: isAppForeground=${this.isAppForeground}`);
   }
 
   aboutToDisappear(): void {
     if (this.streamManager) {
       this.streamManager.release();
       this.streamManager = null;
+    }
+  }
+
+  onAppForegroundChange(): void {
+    console.info(`ActivityStreamScreen onAppForegroundChange: isAppForeground=${this.isAppForeground}, isStreaming=${this.isStreaming}, streamManager=${this.streamManager !== null}`);
+    if (!this.streamManager) {
+      console.warn('ActivityStreamScreen onAppForegroundChange: streamManager is null, skip');
+      return;
+    }
+    if (this.isAppForeground) {
+      console.info('ActivityStreamScreen onAppForegroundChange: calling resumeStream()');
+      this.streamManager.resumeStream();
+    } else {
+      console.info('ActivityStreamScreen onAppForegroundChange: calling pauseStream()');
+      this.streamManager.pauseStream();
     }
   }
 
@@ -205,14 +228,43 @@ export struct ActivityStreamScreen {
               .fontColor(this.onSurfaceVariantColor)
               .margin({ top: 12 })
 
+            if (this.selectedStreamTool === 'rtsp') {
+              Column() {
+                QRCode(this.rtspAddress)
+                  .width(160)
+                  .height(160)
+                Text($r('app.string.scan_to_connect'))
+                  .fontSize(12)
+                  .fontColor(this.onSurfaceVariantColor)
+                  .margin({ top: 8 })
+              }
+              .width('100%')
+              .alignItems(HorizontalAlign.Center)
+              .padding(16)
+              .margin({ top: 12 })
+              .backgroundColor(this.surfaceVariantColor)
+              .borderRadius(16)
+            }
+
             Row({ space: 10 }) {
               Button(this.useFrontCamera ? $r('app.string.switch_to_back') : $r('app.string.switch_to_front'))
                 .layoutWeight(1)
                 .onClick(() => {
                   if (this.streamManager) {
+                    console.info(`ActivityStreamScreen switchCamera onClick: BEFORE ui_useFrontCamera=${this.useFrontCamera}, mgr_useFrontCamera=${this.streamManager.isFrontCamera()}`);
                     this.streamManager.switchCamera().then(() => {
-                      this.useFrontCamera = !this.useFrontCamera;
+                      const mgrFront = this.streamManager!.isFrontCamera();
+                      console.info(`ActivityStreamScreen switchCamera then: mgr_useFrontCamera=${mgrFront}, old ui_useFrontCamera=${this.useFrontCamera}`);
+                      this.useFrontCamera = mgrFront;
+                      console.info(`ActivityStreamScreen switchCamera then: AFTER ui_useFrontCamera=${this.useFrontCamera}`);
+                    }).catch((e: Error) => {
+                      console.error(`ActivityStreamScreen switchCamera failed: ${e.message}`);
+                      const mgrFront = this.streamManager!.isFrontCamera();
+                      console.info(`ActivityStreamScreen switchCamera catch: reverting ui to mgr_useFrontCamera=${mgrFront}`);
+                      this.useFrontCamera = mgrFront;
                     });
+                  } else {
+                    console.warn('ActivityStreamScreen switchCamera onClick: streamManager is null');
                   }
                 })
               Button(this.isStreaming ? $r('app.string.stop_stream') : $r('app.string.start_stream'))
@@ -242,6 +294,118 @@ export struct ActivityStreamScreen {
           .backgroundColor(this.surfaceColor)
           .padding(16)
           .margin({ top: 14 })
+
+          Column() {
+            Row() {
+              Text($r('app.string.motion_detection'))
+                .fontSize(16)
+                .fontColor(this.onSurfaceColor)
+                .fontWeight(FontWeight.Medium)
+                .layoutWeight(1)
+
+              if (this.motionEnabled && this.motionDetected) {
+                Row({ space: 6 }) {
+                  Circle({ width: 8, height: 8 })
+                    .fill('#FF3B30')
+                  Text($r('app.string.motion_detected'))
+                    .fontSize(12)
+                    .fontColor('#FF3B30')
+                    .fontWeight(FontWeight.Medium)
+                }
+              } else if (this.motionEnabled) {
+                Text($r('app.string.motion_idle'))
+                  .fontSize(12)
+                  .fontColor(this.onSurfaceVariantColor)
+              }
+
+              Toggle({ type: ToggleType.Switch, isOn: this.motionEnabled })
+                .onChange((on: boolean) => {
+                  this.motionEnabled = on;
+                  if (on) {
+                    const thresholds: number[] = [5.0, 3.0, 2.0];
+                    this.streamManager?.setMotionThreshold(thresholds[this.motionSensitivity]);
+                  }
+                  this.streamManager?.setMotionEnabled(on);
+                })
+            }
+            .width('100%')
+            .justifyContent(FlexAlign.SpaceBetween)
+
+            if (this.motionEnabled) {
+              Row({ space: 8 }) {
+                Text($r('app.string.motion_sensitivity'))
+                  .fontSize(14)
+                  .fontColor(this.onSurfaceVariantColor)
+
+                ForEach([0, 1, 2], (idx: number) => {
+                  Text(idx === 0 ? $r('app.string.motion_sensitivity_low') :
+                       idx === 1 ? $r('app.string.motion_sensitivity_medium') :
+                       $r('app.string.motion_sensitivity_high'))
+                    .fontSize(12)
+                    .fontColor(this.motionSensitivity === idx ? this.onPrimaryColor : this.onSurfaceVariantColor)
+                    .fontWeight(this.motionSensitivity === idx ? FontWeight.Medium : FontWeight.Normal)
+                    .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+                    .backgroundColor(this.motionSensitivity === idx ? this.accentColor : this.surfaceVariantColor)
+                    .borderRadius(10)
+                    .onClick(() => {
+                      this.motionSensitivity = idx;
+                      const thresholds: number[] = [5.0, 3.0, 2.0];
+                      this.streamManager?.setMotionThreshold(thresholds[idx]);
+                    })
+                }, (idx: number) => idx.toString())
+              }
+              .width('100%')
+              .margin({ top: 10 })
+            }
+          }
+          .width('100%')
+          .borderRadius(20)
+          .backgroundColor(this.surfaceColor)
+          .padding(16)
+          .margin({ top: 14 })
+
+          if (this.motionEnabled) {
+            Text($r('app.string.motion_event_log'))
+              .fontSize(16)
+              .fontColor(this.onSurfaceVariantColor)
+              .fontWeight(FontWeight.Medium)
+              .margin({ top: 14, bottom: 4 })
+
+            if (this.motionEvents.length === 0) {
+              Text($r('app.string.motion_no_events'))
+                .fontSize(14)
+                .fontColor(this.onSurfaceVariantColor)
+                .width('100%')
+                .textAlign(TextAlign.Center)
+                .padding(24)
+            } else {
+              ForEach(this.motionEvents, (evt: MotionEventLog) => {
+                Row() {
+                  Column() {
+                    Text(new Date(evt.timestamp).toLocaleTimeString())
+                      .fontSize(14)
+                      .fontColor(this.onSurfaceColor)
+                      .fontWeight(FontWeight.Medium)
+                    Text(`${evt.frameSize} bytes · ${evt.ratio.toFixed(1)}x`)
+                      .fontSize(12)
+                      .fontColor(this.onSurfaceVariantColor)
+                      .margin({ top: 2 })
+                  }
+                  .layoutWeight(1)
+                  .alignItems(HorizontalAlign.Start)
+
+                  Circle({ width: 8, height: 8 })
+                    .fill('#FF3B30')
+                    .margin({ left: 10 })
+                }
+                .width('100%')
+                .borderRadius(14)
+                .backgroundColor(this.surfaceColor)
+                .padding(14)
+                .margin({ top: 8 })
+              }, (evt: MotionEventLog) => evt.timestamp.toString())
+            }
+          }
 
           Text($r('app.string.activity_log'))
             .fontSize(16)

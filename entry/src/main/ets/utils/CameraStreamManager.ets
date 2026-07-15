@@ -5,7 +5,7 @@ import { RtspServer } from './RtspServer';
 import { RtmpPushManager, RtmpPushConfig, parseRtmpUrl, RtmpPushStatus } from './RtmpPushManager';
 import { PHONE_RTSP_PORT } from './NetworkUtils';
 import { rstr, rstrNum } from './I18nUtils';
-import { createEncoder, startEncoder, stopEncoder, releaseEncoder, EncodedFrame } from 'librtspencoder.so';
+import { createEncoder, startEncoder, stopEncoder, releaseEncoder, EncodedFrame, setMotionDetection, setMotionCallback, MotionEvent } from 'librtspencoder.so';
 
 const TAG = 'CameraStreamManager';
 
@@ -14,6 +14,14 @@ export interface StreamStatus {
   isPreviewReady: boolean;
   statusText: string;
   clientCount: number;
+  motionDetected: boolean;
+  motionEvents: MotionEventLog[];
+}
+
+export interface MotionEventLog {
+  timestamp: number;
+  frameSize: number;
+  ratio: number;
 }
 
 export class CameraStreamManager {
@@ -34,6 +42,11 @@ export class CameraStreamManager {
   private streaming: boolean = false;
   private previewReady: boolean = false;
   private statusCallback: ((status: StreamStatus) => void) | null = null;
+  private motionEnabled: boolean = false;
+  private motionThreshold: number = 3.0;
+  private motionEvents: MotionEventLog[] = [];
+  private motionDetected: boolean = false;
+  private pausedForBackground: boolean = false;
 
   private width: number = 640;
   private height: number = 480;
@@ -71,6 +84,45 @@ export class CameraStreamManager {
     console.info(`${TAG} RTMP config: host=${parsed.host}, port=${parsed.port}, app=${parsed.app}, key=${streamKey}`);
   }
 
+  setMotionEnabled(enabled: boolean): void {
+    this.motionEnabled = enabled;
+    console.info(`${TAG} setMotionEnabled: ${enabled}, streaming=${this.streaming}, threshold=${this.motionThreshold}`);
+    if (this.streaming) {
+      if (enabled) {
+        setMotionCallback((event: MotionEvent) => {
+          this.onMotionEvent(event);
+        });
+        console.info(`${TAG} setMotionEnabled: registered motion callback`);
+      }
+      setMotionDetection(enabled, this.motionThreshold);
+      console.info(`${TAG} setMotionEnabled: called native setMotionDetection(${enabled}, ${this.motionThreshold})`);
+    } else {
+      console.info(`${TAG} setMotionEnabled: not streaming, will apply on startStream`);
+    }
+    if (!enabled) {
+      this.motionDetected = false;
+    }
+    this.notifyStatus();
+  }
+
+  setMotionThreshold(threshold: number): void {
+    this.motionThreshold = threshold;
+    console.info(`${TAG} setMotionThreshold: ${threshold}, streaming=${this.streaming}, motionEnabled=${this.motionEnabled}`);
+    if (this.streaming && this.motionEnabled) {
+      setMotionDetection(true, threshold);
+      console.info(`${TAG} setMotionThreshold: called native setMotionDetection(true, ${threshold})`);
+    }
+  }
+
+  getMotionEvents(): MotionEventLog[] {
+    return this.motionEvents;
+  }
+
+  isFrontCamera(): boolean {
+    console.info(`${TAG} isFrontCamera() => ${this.useFrontCamera}`);
+    return this.useFrontCamera;
+  }
+
   private notifyStatus(): void {
     if (this.statusCallback) {
       const clientCount = this.streamMode === 'rtsp' ? this.rtspServer.getClientCount() : 0;
@@ -79,6 +131,8 @@ export class CameraStreamManager {
         isPreviewReady: this.previewReady,
         statusText: this.getStatusText(),
         clientCount: clientCount,
+        motionDetected: this.motionDetected,
+        motionEvents: this.motionEvents,
       });
     }
   }
@@ -132,6 +186,8 @@ export class CameraStreamManager {
           isPreviewReady: false,
           statusText: rstr(this.context, 'cam_status_need_camera_permission'),
           clientCount: 0,
+          motionDetected: false,
+          motionEvents: this.motionEvents,
         });
         return;
       }
@@ -150,12 +206,14 @@ export class CameraStreamManager {
           isPreviewReady: false,
           statusText: rstr(this.context, 'cam_status_no_camera'),
           clientCount: 0,
+          motionDetected: false,
+          motionEvents: this.motionEvents,
         });
         return;
       }
 
-      const cameraDevice = this.useFrontCamera ? cameras[0] : cameras[cameras.length - 1];
-      console.info(`${TAG} initPreview: selected camera index=${this.useFrontCamera ? 0 : cameras.length - 1}, id=${cameraDevice.cameraId}`);
+      const cameraDevice = this.useFrontCamera ? cameras[cameras.length - 1] : cameras[0];
+      console.info(`${TAG} initPreview: selected camera index=${this.useFrontCamera ? cameras.length - 1 : 0}, id=${cameraDevice.cameraId}`);
 
       const outputCapability = this.cameraManager.getSupportedOutputCapability(cameraDevice, camera.SceneMode.NORMAL_VIDEO);
       console.info(`${TAG} initPreview: previewProfiles count=${outputCapability.previewProfiles.length}, videoProfiles count=${outputCapability.videoProfiles.length}`);
@@ -184,6 +242,8 @@ export class CameraStreamManager {
           isPreviewReady: false,
           statusText: rstr(this.context, 'cam_status_session_failed'),
           clientCount: 0,
+          motionDetected: false,
+          motionEvents: this.motionEvents,
         });
         return;
       }
@@ -211,6 +271,8 @@ export class CameraStreamManager {
         isPreviewReady: false,
         statusText: rstr(this.context, 'cam_status_preview_init_failed', err.message),
         clientCount: 0,
+        motionDetected: false,
+        motionEvents: this.motionEvents,
       });
     }
   }
@@ -241,6 +303,8 @@ export class CameraStreamManager {
             isPreviewReady: this.previewReady,
             statusText: rstr(this.context, 'cam_status_configure_rtmp'),
             clientCount: 0,
+            motionDetected: false,
+            motionEvents: this.motionEvents,
           });
           return;
         }
@@ -270,7 +334,7 @@ export class CameraStreamManager {
       if (this.cameraManager && this.session) {
         console.info(`${TAG} startStream: creating VideoOutput...`);
         const cameras = this.cameraManager.getSupportedCameras();
-        const cameraDevice = this.useFrontCamera ? cameras[0] : cameras[cameras.length - 1];
+        const cameraDevice = this.useFrontCamera ? cameras[cameras.length - 1] : cameras[0];
         const outputCapability = this.cameraManager.getSupportedOutputCapability(cameraDevice, camera.SceneMode.NORMAL_VIDEO);
 
         const videoProfile = outputCapability.videoProfiles.find((p: camera.VideoProfile) => {
@@ -305,6 +369,16 @@ export class CameraStreamManager {
       startEncoder();
       console.info(`${TAG} startStream: encoder started`);
 
+      if (this.motionEnabled) {
+        setMotionCallback((event: MotionEvent) => {
+          this.onMotionEvent(event);
+        });
+        setMotionDetection(true, this.motionThreshold);
+        console.info(`${TAG} startStream: motion detection enabled, threshold=${this.motionThreshold}`);
+      } else {
+        console.info(`${TAG} startStream: motion detection NOT enabled (motionEnabled=false)`);
+      }
+
       this.streaming = true;
       this.notifyStatus();
       console.info(`${TAG} startStream END: success`);
@@ -316,6 +390,8 @@ export class CameraStreamManager {
         isPreviewReady: this.previewReady,
         statusText: rstr(this.context, 'cam_status_start_failed', err.message),
         clientCount: 0,
+        motionDetected: false,
+        motionEvents: this.motionEvents,
       });
     }
   }
@@ -324,17 +400,32 @@ export class CameraStreamManager {
     if (!this.streaming) return;
     try {
       this.streaming = false;
+      this.pausedForBackground = false;
+
+      if (this.motionEnabled) {
+        setMotionDetection(false, 0);
+        console.info(`${TAG} stopStream: motion detection disabled via native`);
+      }
+      this.motionDetected = false;
 
       stopEncoder();
 
       if (this.videoOutput) {
-        this.videoOutput.stop();
-        if (this.session) {
-          this.session.beginConfig();
-          this.session.removeOutput(this.videoOutput);
-          await this.session.commitConfig();
+        try { this.videoOutput.stop(); } catch (e) {
+          console.warn(`${TAG} stopStream: videoOutput.stop() error: ${(e as Error).message}`);
         }
-        this.videoOutput.release();
+        if (this.session) {
+          try {
+            this.session.beginConfig();
+            this.session.removeOutput(this.videoOutput);
+            await this.session.commitConfig();
+          } catch (e) {
+            console.warn(`${TAG} stopStream: removeOutput error: ${(e as Error).message}`);
+          }
+        }
+        try { this.videoOutput.release(); } catch (e) {
+          console.warn(`${TAG} stopStream: videoOutput.release() error: ${(e as Error).message}`);
+        }
         this.videoOutput = null;
       }
 
@@ -353,40 +444,236 @@ export class CameraStreamManager {
     }
   }
 
+  async pauseStream(): Promise<void> {
+    console.info(`${TAG} pauseStream BEGIN: streaming=${this.streaming}, pausedForBackground=${this.pausedForBackground}`);
+    if (!this.streaming || this.pausedForBackground) {
+      console.info(`${TAG} pauseStream: skipped (streaming=${this.streaming}, paused=${this.pausedForBackground})`);
+      return;
+    }
+    try {
+      this.pausedForBackground = true;
+
+      if (this.motionEnabled) {
+        console.info(`${TAG} pauseStream: disabling motion detection`);
+        setMotionDetection(false, 0);
+      }
+
+      console.info(`${TAG} pauseStream: stopping encoder...`);
+      stopEncoder();
+      console.info(`${TAG} pauseStream: encoder stopped`);
+
+      if (this.videoOutput) {
+        console.info(`${TAG} pauseStream: stopping videoOutput...`);
+        try { this.videoOutput.stop(); } catch (e) {
+          console.warn(`${TAG} pauseStream: videoOutput.stop() error: ${(e as Error).message}`);
+        }
+        try {
+          if (this.session) {
+            this.session.beginConfig();
+            this.session.removeOutput(this.videoOutput);
+            await this.session.commitConfig();
+          }
+        } catch (e) {
+          console.warn(`${TAG} pauseStream: removeOutput error (expected if session dead): ${(e as Error).message}`);
+        }
+        this.videoOutput.release();
+        this.videoOutput = null;
+        console.info(`${TAG} pauseStream: videoOutput released`);
+      }
+
+      console.info(`${TAG} pauseStream: releasing session/input/preview (will be dead in background)...`);
+      if (this.session) {
+        try { await this.session.stop(); } catch (e) {}
+        try { this.session.release(); } catch (e) {}
+        this.session = null;
+      }
+      if (this.cameraInput) {
+        try { this.cameraInput.close(); } catch (e) {}
+        this.cameraInput = null;
+      }
+      if (this.previewOutput) {
+        try { this.previewOutput.release(); } catch (e) {}
+        this.previewOutput = null;
+      }
+      this.previewReady = false;
+
+      console.info(`${TAG} pauseStream: releasing encoder...`);
+      releaseEncoder();
+      console.info(`${TAG} pauseStream END: all camera resources released, RTSP server kept alive`);
+    } catch (e) {
+      console.error(`${TAG} pauseStream EXCEPTION: ${(e as Error).message}, stack=${(e as Error).stack}`);
+    }
+  }
+
+  async resumeStream(): Promise<void> {
+    console.info(`${TAG} resumeStream BEGIN: streaming=${this.streaming}, pausedForBackground=${this.pausedForBackground}`);
+    if (!this.pausedForBackground) {
+      console.info(`${TAG} resumeStream: skipped (not paused)`);
+      return;
+    }
+    try {
+      this.pausedForBackground = false;
+
+      // Step 1: Recreate camera session (session/input/preview were released in pauseStream)
+      console.info(`${TAG} resumeStream: re-initializing camera preview...`);
+      await this.initPreview(this.previewSurfaceId);
+      if (!this.session || !this.cameraInput || !this.previewOutput) {
+        console.error(`${TAG} resumeStream: initPreview failed, cannot resume`);
+        this.streaming = false;
+        this.notifyStatus();
+        return;
+      }
+      console.info(`${TAG} resumeStream: camera session recreated`);
+
+      // Step 2: Create encoder
+      console.info(`${TAG} resumeStream: creating encoder ${this.width}x${this.height}...`);
+      this.encoderSurfaceId = createEncoder(this.width, this.height, this.bitrate, this.framerate,
+        (frame: EncodedFrame) => {
+          this.onEncodedFrame(frame);
+        });
+      console.info(`${TAG} resumeStream: encoder surfaceId=${this.encoderSurfaceId}`);
+
+      if (!this.encoderSurfaceId) {
+        console.error(`${TAG} resumeStream: Failed to create encoder, stopping stream`);
+        this.streaming = false;
+        this.notifyStatus();
+        return;
+      }
+
+      // Step 3: Create video output and add to session
+      console.info(`${TAG} resumeStream: getting camera list...`);
+      const cameras = this.cameraManager!.getSupportedCameras();
+      const cameraDevice = this.useFrontCamera ? cameras[cameras.length - 1] : cameras[0];
+      const outputCapability = this.cameraManager!.getSupportedOutputCapability(cameraDevice, camera.SceneMode.NORMAL_VIDEO);
+      const videoProfile = outputCapability.videoProfiles.find((p: camera.VideoProfile) => {
+        return p.size.width === this.width && p.size.height === this.height;
+      }) ?? outputCapability.videoProfiles[0];
+
+      console.info(`${TAG} resumeStream: creating VideoOutput...`);
+      this.videoOutput = this.cameraManager!.createVideoOutput(videoProfile, this.encoderSurfaceId);
+      console.info(`${TAG} resumeStream: VideoOutput created`);
+
+      console.info(`${TAG} resumeStream: stopping session to add video output...`);
+      try { await this.session.stop(); } catch (e) {
+        console.warn(`${TAG} resumeStream: session.stop() error: ${(e as Error).message}`);
+      }
+      console.info(`${TAG} resumeStream: reconfiguring session with video output...`);
+      this.session.beginConfig();
+      this.session.addOutput(this.videoOutput);
+      await this.session.commitConfig();
+      console.info(`${TAG} resumeStream: starting session...`);
+      await this.session.start();
+      console.info(`${TAG} resumeStream: starting videoOutput...`);
+      this.videoOutput.start();
+      console.info(`${TAG} resumeStream: session+videoOutput restarted`);
+
+      // Step 4: Start encoder
+      console.info(`${TAG} resumeStream: starting encoder...`);
+      startEncoder();
+      console.info(`${TAG} resumeStream: encoder started`);
+
+      // Step 5: Re-enable motion detection if needed
+      if (this.motionEnabled) {
+        setMotionCallback((event: MotionEvent) => {
+          this.onMotionEvent(event);
+        });
+        setMotionDetection(true, this.motionThreshold);
+        console.info(`${TAG} resumeStream: motion detection re-enabled`);
+      }
+
+      console.info(`${TAG} resumeStream END: success`);
+    } catch (e) {
+      console.error(`${TAG} resumeStream EXCEPTION: ${(e as Error).message}, stack=${(e as Error).stack}`);
+      this.streaming = false;
+      this.notifyStatus();
+    }
+  }
+
+  private onMotionEvent(event: MotionEvent): void {
+    console.info(`${TAG} onMotionEvent: timestamp=${event.timestamp}, frameSize=${event.frameSize}, avgSize=${event.avgSize}, ratio=${event.ratio.toFixed(2)}`);
+    const log: MotionEventLog = {
+      timestamp: event.timestamp,
+      frameSize: event.frameSize,
+      ratio: event.ratio,
+    };
+    this.motionEvents.unshift(log);
+    if (this.motionEvents.length > 50) {
+      this.motionEvents = this.motionEvents.slice(0, 50);
+    }
+    this.motionDetected = true;
+    this.notifyStatus();
+
+    setTimeout(() => {
+      this.motionDetected = false;
+      this.notifyStatus();
+    }, 2000);
+  }
+
   async switchCamera(): Promise<void> {
+    console.info(`${TAG} switchCamera BEGIN: currentFront=${this.useFrontCamera}, streaming=${this.streaming}`);
+    const oldFront = this.useFrontCamera;
     const newFront = !this.useFrontCamera;
     const wasStreaming = this.streaming;
 
-    if (wasStreaming) {
-      await this.stopStream();
-    }
+    try {
+      if (wasStreaming) {
+        console.info(`${TAG} switchCamera: stopping stream...`);
+        await this.stopStream();
+      }
 
-    // Release current preview
-    if (this.session) {
-      await this.session.stop();
-      this.session.release();
-      this.session = null;
-    }
-    if (this.cameraInput) {
-      this.cameraInput.close();
-      this.cameraInput = null;
-    }
-    if (this.previewOutput) {
-      this.previewOutput.release();
-      this.previewOutput = null;
-    }
-    this.previewReady = false;
+      // Release current preview
+      console.info(`${TAG} switchCamera: releasing session/input/preview...`);
+      if (this.session) {
+        try { await this.session.stop(); } catch (e) {
+          console.warn(`${TAG} switchCamera: session.stop() error: ${(e as Error).message}`);
+        }
+        try { this.session.release(); } catch (e) {
+          console.warn(`${TAG} switchCamera: session.release() error: ${(e as Error).message}`);
+        }
+        this.session = null;
+      }
+      if (this.cameraInput) {
+        try { this.cameraInput.close(); } catch (e) {
+          console.warn(`${TAG} switchCamera: cameraInput.close() error: ${(e as Error).message}`);
+        }
+        this.cameraInput = null;
+      }
+      if (this.previewOutput) {
+        try { this.previewOutput.release(); } catch (e) {
+          console.warn(`${TAG} switchCamera: previewOutput.release() error: ${(e as Error).message}`);
+        }
+        this.previewOutput = null;
+      }
+      this.previewReady = false;
+      console.info(`${TAG} switchCamera: old camera resources released`);
 
-    this.useFrontCamera = newFront;
+      this.useFrontCamera = newFront;
 
-    // Re-init preview with new camera
-    await this.initPreview(this.previewSurfaceId);
+      // Re-init preview with new camera
+      console.info(`${TAG} switchCamera: re-init preview with ${newFront ? 'front' : 'back'} camera...`);
+      await this.initPreview(this.previewSurfaceId);
+      if (!this.previewReady) {
+        console.error(`${TAG} switchCamera: initPreview failed, reverting useFrontCamera to ${oldFront}`);
+        this.useFrontCamera = oldFront;
+        this.notifyStatus();
+        return;
+      }
+      console.info(`${TAG} switchCamera: preview re-initialized, previewReady=${this.previewReady}`);
 
-    if (wasStreaming) {
-      await this.startStream();
+      if (wasStreaming) {
+        console.info(`${TAG} switchCamera: restarting stream...`);
+        await this.startStream();
+      }
+
+      this.notifyStatus();
+      console.info(`${TAG} switchCamera END: success, useFrontCamera=${this.useFrontCamera}`);
+    } catch (e) {
+      console.error(`${TAG} switchCamera EXCEPTION: ${(e as Error).message}, stack=${(e as Error).stack}`);
+      console.error(`${TAG} switchCamera: reverting useFrontCamera from ${newFront} back to ${oldFront}`);
+      this.useFrontCamera = oldFront;
+      this.notifyStatus();
+      throw new Error(`switchCamera failed: ${(e as Error).message}`);
     }
-
-    this.notifyStatus();
   }
 
   private onEncodedFrame(frame: EncodedFrame): void {

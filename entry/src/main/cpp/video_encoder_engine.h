@@ -17,6 +17,13 @@ struct EncoderCallbackData {
     uint32_t flags;
 };
 
+struct MotionEventData {
+    int64_t timestamp;
+    int32_t frameSize;
+    int32_t avgSize;
+    double ratio;
+};
+
 class VideoEncoderEngine {
 public:
     VideoEncoderEngine();
@@ -27,6 +34,8 @@ public:
     void stop();
     void release();
     void setCallback(napi_env env, napi_value callback);
+    void setMotionDetection(bool enabled, float threshold);
+    void setMotionCallback(napi_env env, napi_value callback);
 
 private:
     OH_AVCodec* encoder_ = nullptr;
@@ -42,5 +51,14 @@ private:
     static void onNewOutputBuffer(OH_AVCodec* codec, uint32_t index, OH_AVBuffer* buffer, void* userData);
 
     void handleOutputBuffer(uint32_t index, OH_AVBuffer* buffer);
+    void checkMotion(int32_t frameSize, uint32_t flags);
     static void callJsCallback(napi_env env, napi_value jsCb, void* context, void* data);
+    static void callJsMotionCallback(napi_env env, napi_value jsCb, void* context, void* data);
+
+    std::atomic<bool> motionEnabled_{false};
+    float motionThreshold_ = 3.0f;
+    float pFrameAvgSize_ = 0.0f;
+    int64_t lastMotionTimeMs_ = 0;
+    int64_t motionCooldownMs_ = 2000;
+    napi_threadsafe_function motionTsfn_ = nullptr;
 };
