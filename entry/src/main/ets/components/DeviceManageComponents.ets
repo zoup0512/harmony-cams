@@ -16,17 +16,16 @@ export struct DeviceManageTopBar {
   build(): void {
     Row() {
       if (this.flowStep === DeviceFlowStep.Landing) {
-        Text('✕')
+        SymbolGlyph($r('sys.symbol.xmark'))
           .fontSize(22)
-          .fontColor(this.onSurfaceVariantColor)
+          .fontColor([this.onSurfaceVariantColor])
           .onClick(() => this.onCancel())
       } else if (this.flowStep === DeviceFlowStep.VendorPicker) {
-        Text('✕')
-          .fontSize(20)
-          .fontColor(this.onSurfaceColor)
+        SymbolGlyph($r('sys.symbol.xmark'))
+          .fontSize(18)
+          .fontColor([this.onSurfaceColor])
           .width(38)
           .height(38)
-          .textAlign(TextAlign.Center)
           .borderRadius(19)
           .backgroundColor('#33888888')
           .onClick(() => this.onBack())
@@ -36,12 +35,11 @@ export struct DeviceManageTopBar {
           .fontColor(this.errorColor)
           .onClick(() => this.onCancel())
       } else {
-        Text('‹')
-          .fontSize(24)
-          .fontColor(this.onSurfaceColor)
+        SymbolGlyph($r('sys.symbol.chevron_left'))
+          .fontSize(22)
+          .fontColor([this.onSurfaceColor])
           .width(38)
           .height(38)
-          .textAlign(TextAlign.Center)
           .borderRadius(19)
           .backgroundColor('#33888888')
           .onClick(() => this.onBack())
@@ -54,19 +52,8 @@ export struct DeviceManageTopBar {
         .textAlign(TextAlign.Center)
         .layoutWeight(1)
 
-      if (this.flowStep === DeviceFlowStep.Landing || this.flowStep === DeviceFlowStep.Form) {
-        Text('?')
-          .fontSize(18)
-          .fontColor(this.onSurfaceColor)
-          .width(38)
-          .height(38)
-          .textAlign(TextAlign.Center)
-          .borderRadius(19)
-          .backgroundColor('#33888888')
-      } else {
-        Text('')
-          .width(38)
-      }
+      Text('')
+        .width(38)
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
@@ -96,9 +83,9 @@ export struct AddCameraLandingScreen {
           Stack() {
             Circle({ width: 56, height: 56 })
               .fill(this.secondaryContainerColor)
-            Text('⌕')
+            SymbolGlyph($r('sys.symbol.magnifyingglass'))
               .fontSize(28)
-              .fontColor(this.accentColor)
+              .fontColor([this.accentColor])
           }
           .width(56)
           .height(56)
@@ -126,9 +113,9 @@ export struct AddCameraLandingScreen {
             Stack() {
               Circle({ width: 54, height: 54 })
                 .fill(this.secondaryContainerColor)
-              Text('+')
-                .fontSize(28)
-                .fontColor(this.accentColor)
+              SymbolGlyph($r('sys.symbol.plus'))
+                .fontSize(24)
+                .fontColor([this.accentColor])
                 .fontWeight(FontWeight.Bold)
             }
             .width(54)
@@ -245,9 +232,9 @@ export struct AddCameraFormScreen {
                 .backgroundColor(Color.Transparent)
                 .layoutWeight(1)
                 .onChange((v: string) => this.onManageHostChange(v))
-              Text('⌕')
+              SymbolGlyph($r('sys.symbol.magnifyingglass'))
                 .fontSize(20)
-                .fontColor(this.accentColor)
+                .fontColor([this.accentColor])
                 .margin({ left: 8 })
             }
             .width('100%')
@@ -277,7 +264,7 @@ export struct AddCameraFormScreen {
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
                 .width(96)
-              TextInput({ text: this.manageUsername, placeholder: 'admin' })
+              TextInput({ text: this.manageUsername, placeholder: $r('app.string.username_placeholder_admin') })
                 .fontSize(16)
                 .fontColor(this.onSurfaceColor)
                 .placeholderColor(this.placeholderColor)
@@ -336,9 +323,9 @@ export struct AddCameraFormScreen {
               Text(this.manageVendor.trim() !== '' ? this.manageVendor : getContext(this).resourceManager.getStringByNameSync('auto_detect_onvif'))
                 .fontSize(16)
                 .fontColor(this.onSurfaceVariantColor)
-              Text('›')
+              SymbolGlyph($r('sys.symbol.chevron_right'))
                 .fontSize(20)
-                .fontColor(this.onSurfaceVariantColor)
+                .fontColor([this.onSurfaceVariantColor])
                 .margin({ left: 8 })
             }
             .width('100%')
@@ -561,9 +548,9 @@ export struct AddCameraVerificationScreen {
                 .height(22)
                 .color(this.onSurfaceVariantColor)
             } else {
-              Text('✔')
+              SymbolGlyph($r('sys.symbol.checkmark'))
                 .fontSize(18)
-                .fontColor(this.accentColor)
+                .fontColor([this.accentColor])
             }
           }
           .width('100%')
@@ -583,9 +570,9 @@ export struct AddCameraVerificationScreen {
               .fontSize(16)
               .fontColor(this.onSurfaceColor)
               .layoutWeight(1)
-            Text('●')
-              .fontSize(16)
-              .fontColor(this.isConnecting ? this.onSurfaceVariantColor : this.accentColor)
+            SymbolGlyph($r('sys.symbol.circle_fill'))
+              .fontSize(12)
+              .fontColor([this.isConnecting ? this.onSurfaceVariantColor : this.accentColor])
           }
           .width('100%')
           .borderRadius(16)
@@ -632,11 +619,12 @@ export struct AddCameraVerificationScreen {
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
 
-              Text('📷')
+              SymbolGlyph($r('sys.symbol.camera_fill'))
                 .fontSize(18)
-              Text('›')
+                .fontColor([this.onSurfaceVariantColor])
+              SymbolGlyph($r('sys.symbol.chevron_right'))
                 .fontSize(20)
-                .fontColor(this.onSurfaceVariantColor)
+                .fontColor([this.onSurfaceVariantColor])
                 .margin({ left: 8 })
             }
             .width('100%')
@@ -724,14 +712,14 @@ export struct ManufacturerPickerScreen {
           .fontColor(this.onSurfaceColor)
           .layoutWeight(1)
         if (this.selectedVendor === brand) {
-          Text('✔')
+          SymbolGlyph($r('sys.symbol.checkmark'))
             .fontSize(16)
-            .fontColor(this.accentColor)
+            .fontColor([this.accentColor])
             .margin({ right: 8 })
         }
-        Text('›')
+        SymbolGlyph($r('sys.symbol.chevron_right'))
           .fontSize(20)
-          .fontColor(this.onSurfaceVariantColor)
+          .fontColor([this.onSurfaceVariantColor])
       }
       .width('100%')
       .padding({ top: 16, bottom: 16 })
@@ -766,9 +754,9 @@ export struct ManufacturerPickerScreen {
   build(): void {
     Column() {
       Row() {
-        Text('⌕')
+        SymbolGlyph($r('sys.symbol.magnifyingglass'))
           .fontSize(18)
-          .fontColor(this.onSurfaceVariantColor)
+          .fontColor([this.onSurfaceVariantColor])
           .margin({ right: 6 })
         TextInput({ text: this.searchQuery, placeholder: $r('app.string.search_manufacturer') })
           .fontSize(16)
@@ -792,9 +780,9 @@ export struct ManufacturerPickerScreen {
                 .fontColor(this.onSurfaceColor)
                 .layoutWeight(1)
               if (this.selectedVendor.trim() === '') {
-                Text('✔')
+                SymbolGlyph($r('sys.symbol.checkmark'))
                   .fontSize(16)
-                  .fontColor(this.accentColor)
+                  .fontColor([this.accentColor])
               }
             }
             .width('100%')

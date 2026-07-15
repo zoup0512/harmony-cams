@@ -335,6 +335,17 @@
     { "name": "dialog_browse_path_title", "value": "Select Storage Directory" },
     { "name": "browse_parent_dir", "value": "Parent Directory" },
     { "name": "browse_select_current", "value": "Select This Directory" },
-    { "name": "browse_empty", "value": "No subdirectories" }
+    { "name": "browse_empty", "value": "No subdirectories" },
+
+    { "name": "dialog_set_pin_title", "value": "Set Unlock PIN" },
+    { "name": "dialog_set_pin_hint", "value": "Enter a 4-digit PIN" },
+    { "name": "dialog_confirm_pin_hint", "value": "Re-enter PIN to confirm" },
+    { "name": "toast_pin_invalid_length", "value": "PIN must be 4 digits" },
+    { "name": "toast_pin_mismatch", "value": "PINs do not match" },
+    { "name": "toast_pin_set_success", "value": "App lock enabled" },
+    { "name": "dialog_clear_recordings_title", "value": "Clear all recordings?" },
+    { "name": "dialog_clear_recordings_message", "value": "This will permanently delete all local recording files. This action cannot be undone." },
+    { "name": "network_source_url_placeholder", "value": "rtsp://, http://, rtmp://, smb:// ..." },
+    { "name": "username_placeholder_admin", "value": "admin" }
   ]
 }

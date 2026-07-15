@@ -11,7 +11,7 @@ interface FilterChipItem {
 
 interface TabBarItem {
   label: string;
-  icon: string;
+  icon: Resource;
   index: number;
 }
 
@@ -37,17 +37,17 @@ export struct NvrMainTopBar {
           .enabled(this.selectedTab === 0)
 
         Row({ space: 14 }) {
-          Text('☰')
+          SymbolGlyph($r('sys.symbol.line_3_horizontal'))
             .fontSize(22)
-            .fontColor(this.accentColor)
+            .fontColor([this.accentColor])
             .onClick(() => this.onMenuClick())
 
           Stack() {
             Circle({ width: 30, height: 30 })
               .fill(this.accentColor)
-            Text('+')
-              .fontSize(20)
-              .fontColor(this.onPrimaryColor)
+            SymbolGlyph($r('sys.symbol.plus'))
+              .fontSize(18)
+              .fontColor([this.onPrimaryColor])
               .fontWeight(FontWeight.Bold)
           }
           .width(30)
@@ -114,9 +114,9 @@ export struct CameraHomeScreen {
         Stack() {
           Circle({ width: 72, height: 72 })
             .fill(this.surfaceVariantColor)
-          Text('◉')
+          SymbolGlyph($r('sys.symbol.camera_fill'))
             .fontSize(32)
-            .fontColor(this.accentColor)
+            .fontColor([this.accentColor])
         }
         .width(72)
         .height(72)
@@ -132,25 +132,15 @@ export struct CameraHomeScreen {
           .fontColor(this.onSurfaceVariantColor)
           .margin({ top: 6 })
 
-        Row({ space: 12 }) {
-          Text($r('app.string.add_camera'))
-            .fontSize(16)
-            .fontColor(this.onPrimaryColor)
-            .fontWeight(FontWeight.Bold)
-            .padding({ left: 22, right: 22, top: 12, bottom: 12 })
-            .backgroundColor(this.accentColor)
-            .borderRadius(18)
-            .onClick(() => this.onAddCamera())
-
-          Text($r('app.string.demo_mode'))
-            .fontSize(16)
-            .fontColor(this.onBackgroundColor)
-            .fontWeight(FontWeight.Bold)
-            .padding({ left: 22, right: 22, top: 12, bottom: 12 })
-            .backgroundColor(this.surfaceVariantColor)
-            .borderRadius(18)
-        }
-        .margin({ top: 24 })
+        Text($r('app.string.add_camera'))
+          .fontSize(16)
+          .fontColor(this.onPrimaryColor)
+          .fontWeight(FontWeight.Bold)
+          .padding({ left: 22, right: 22, top: 12, bottom: 12 })
+          .backgroundColor(this.accentColor)
+          .borderRadius(18)
+          .margin({ top: 24 })
+          .onClick(() => this.onAddCamera())
       }
       .width('100%')
       .height('100%')
@@ -172,9 +162,9 @@ export struct CameraHomeScreen {
             .onChange((v: string) => this.onSearchChange(v))
 
           if (this.searchQuery !== '') {
-            Text('✕')
+            SymbolGlyph($r('sys.symbol.xmark'))
               .fontSize(16)
-              .fontColor(this.onSurfaceVariantColor)
+              .fontColor([this.onSurfaceVariantColor])
               .margin({ left: 8 })
               .onClick(() => this.onSearchChange(''))
           }
@@ -399,15 +389,11 @@ export struct PlaybackFullscreenScreen {
   onTogglePlayPause: () => void = () => {};
   onMute: () => void = () => {};
   onSnapshot: () => void = () => {};
-  onMore: () => void = () => {};
   onToggleRecord: () => void = () => {};
   onSwipeLeft: () => void = () => {};
   onSwipeRight: () => void = () => {};
-  onPtzCommand: (command: string) => void = () => {};
-  showPtzControls: boolean = false;
   @State controlsVisible: boolean = false;
   @State zoomScale: number = 1.0;
-  @State showPtzPad: boolean = false;
   @Prop videoWidth: number = 0;
   @Prop videoHeight: number = 0;
   private controlsTimerId: number = -1;
@@ -506,9 +492,9 @@ export struct PlaybackFullscreenScreen {
       if (this.controlsVisible) {
         Column() {
           Row() {
-            Text('‹')
-              .fontSize(32)
-              .fontColor('#FFFFFF')
+            SymbolGlyph($r('sys.symbol.chevron_left'))
+              .fontSize(28)
+              .fontColor(['#FFFFFF'])
               .onClick(() => this.onBack())
 
             Text(this.camera.name || this.badge)
@@ -532,78 +518,17 @@ export struct PlaybackFullscreenScreen {
             colors: [['#CC000000', 0.0], ['#00000000', 1.0]]
           })
 
-          Stack() {
-            // PTZ control pad
-            if (this.showPtzPad || this.showPtzControls) {
-              Column() {
-                Blank()
-                Row() {
-                  Column() {
-                    Text('▲')
-                      .fontSize(24)
-                      .fontColor('#FFFFFFCC')
-                      .width(48)
-                      .height(48)
-                      .textAlign(TextAlign.Center)
-                      .onClick(() => this.onPtzCommand('up'))
-
-                    Row() {
-                      Text('◀')
-                        .fontSize(24)
-                        .fontColor('#FFFFFFCC')
-                        .width(48)
-                        .height(48)
-                        .textAlign(TextAlign.Center)
-                        .onClick(() => this.onPtzCommand('left'))
-
-                      Text('●')
-                        .fontSize(20)
-                        .fontColor('#FFFFFF80')
-                        .width(48)
-                        .height(48)
-                        .textAlign(TextAlign.Center)
-                        .onClick(() => this.onPtzCommand('home'))
-
-                      Text('▶')
-                        .fontSize(24)
-                        .fontColor('#FFFFFFCC')
-                        .width(48)
-                        .height(48)
-                        .textAlign(TextAlign.Center)
-                        .onClick(() => this.onPtzCommand('right'))
-                    }
-
-                    Text('▼')
-                      .fontSize(24)
-                      .fontColor('#FFFFFFCC')
-                      .width(48)
-                      .height(48)
-                      .textAlign(TextAlign.Center)
-                      .onClick(() => this.onPtzCommand('down'))
-                  }
-                  .alignItems(HorizontalAlign.Center)
-                  .backgroundColor('#33000000')
-                  .borderRadius(16)
-                  .padding(8)
-                }
-                .padding({ left: 20, bottom: 10 })
-              }
-              .width('100%')
-              .height('100%')
-              .alignItems(HorizontalAlign.Start)
-            }
-          }
-          .width('100%')
-          .layoutWeight(1)
+          Blank()
+            .width('100%')
+            .layoutWeight(1)
 
           Row() {
             Row() {
-              Text('📷')
+              SymbolGlyph($r('sys.symbol.camera_fill'))
                 .fontSize(20)
-                .fontColor('#FFFFFFB3')
+                .fontColor(['#FFFFFFB3'])
                 .width(40)
                 .height(40)
-                .textAlign(TextAlign.Center)
                 .onClick(() => this.onSnapshot())
 
               SymbolGlyph($r('sys.symbol.record_circle'))
@@ -616,31 +541,21 @@ export struct PlaybackFullscreenScreen {
               Stack() {
                 Circle({ width: 56, height: 56 })
                   .fill(this.accentColor)
-                Text(this.isPlaying ? '⏸' : '▶')
-                  .fontSize(26)
-                  .fontColor('#FFFFFF')
+                SymbolGlyph(this.isPlaying ? $r('sys.symbol.pause_fill') : $r('sys.symbol.play_fill'))
+                  .fontSize(24)
+                  .fontColor(['#FFFFFF'])
                   .fontWeight(FontWeight.Bold)
               }
               .width(56)
               .height(56)
               .onClick(() => this.onTogglePlayPause())
 
-              Text(this.isMuted ? '🔇' : '🔊')
+              SymbolGlyph(this.isMuted ? $r('sys.symbol.speaker_slash_fill') : $r('sys.symbol.speaker_wave_2_fill'))
                 .fontSize(20)
-                .fontColor('#FFFFFFB3')
+                .fontColor(['#FFFFFFB3'])
                 .width(40)
                 .height(40)
-                .textAlign(TextAlign.Center)
                 .onClick(() => this.onMute())
-
-              Text('⋮')
-                .fontSize(20)
-                .fontColor('#FFFFFF')
-                .width(40)
-                .height(40)
-                .textAlign(TextAlign.Center)
-                .border({ width: 2, color: '#FFFFFF', radius: 20 })
-                .onClick(() => this.onMore())
             }
             .width('50%')
             .justifyContent(FlexAlign.SpaceEvenly)
@@ -687,16 +602,16 @@ export struct NvrBottomBar {
   build(): void {
     Row() {
       ForEach([
-        { label: getContext(this).resourceManager.getStringByNameSync('tab_cameras'), icon: '📹', index: 0 },
-        { label: getContext(this).resourceManager.getStringByNameSync('tab_browse'), icon: '🧭', index: 1 },
-        { label: getContext(this).resourceManager.getStringByNameSync('tab_activity'), icon: '📊', index: 2 },
-        { label: getContext(this).resourceManager.getStringByNameSync('tab_snapshots'), icon: '📷', index: 3 },
-        { label: getContext(this).resourceManager.getStringByNameSync('tab_settings'), icon: '⚙', index: 4 },
+        { label: getContext(this).resourceManager.getStringByNameSync('tab_cameras'), icon: $r('sys.symbol.video_fill'), index: 0 },
+        { label: getContext(this).resourceManager.getStringByNameSync('tab_browse'), icon: $r('sys.symbol.compass'), index: 1 },
+        { label: getContext(this).resourceManager.getStringByNameSync('tab_activity'), icon: $r('sys.symbol.histogram'), index: 2 },
+        { label: getContext(this).resourceManager.getStringByNameSync('tab_snapshots'), icon: $r('sys.symbol.camera_fill'), index: 3 },
+        { label: getContext(this).resourceManager.getStringByNameSync('tab_settings'), icon: $r('sys.symbol.gearshape_fill'), index: 4 },
       ], (item: TabBarItem) => {
         Column() {
-          Text(item.icon)
+          SymbolGlyph(item.icon)
             .fontSize(22)
-            .fontColor(this.selectedTab === item.index ? this.accentColor : this.onSurfaceVariantColor)
+            .fontColor([this.selectedTab === item.index ? this.accentColor : this.onSurfaceVariantColor])
           Text(item.label)
             .fontSize(11)
             .fontColor(this.selectedTab === item.index ? this.accentColor : this.onSurfaceVariantColor)
@@ -752,9 +667,9 @@ export struct CameraActionOverlay {
               .fontSize(16)
               .fontColor(this.onSurfaceColor)
               .layoutWeight(1)
-            Text('⚙')
+            SymbolGlyph($r('sys.symbol.gearshape_fill'))
               .fontSize(20)
-              .fontColor(this.onSurfaceColor)
+              .fontColor([this.onSurfaceColor])
           }
           .width('100%')
           .justifyContent(FlexAlign.SpaceBetween)
@@ -768,9 +683,9 @@ export struct CameraActionOverlay {
               .fontSize(16)
               .fontColor(this.onSurfaceColor)
               .layoutWeight(1)
-            Text('⊞')
+            SymbolGlyph($r('sys.symbol.square_on_square_fill'))
               .fontSize(20)
-              .fontColor(this.onSurfaceColor)
+              .fontColor([this.onSurfaceColor])
           }
           .width('100%')
           .justifyContent(FlexAlign.SpaceBetween)
@@ -784,9 +699,9 @@ export struct CameraActionOverlay {
               .fontSize(16)
               .fontColor(this.onSurfaceColor)
               .layoutWeight(1)
-            Text('🗑')
+            SymbolGlyph($r('sys.symbol.trash_fill'))
               .fontSize(20)
-              .fontColor(this.onSurfaceColor)
+              .fontColor([this.onSurfaceColor])
           }
           .width('100%')
           .justifyContent(FlexAlign.SpaceBetween)

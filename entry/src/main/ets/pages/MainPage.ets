@@ -10,7 +10,7 @@ import { NvrMainTopBar, NvrBottomBar, CameraHomeScreen, PlaybackFullscreenScreen
 import { DeviceManageTopBar, AddCameraLandingScreen, AddCameraFormScreen, AddCameraVerificationScreen, ManufacturerPickerScreen } from '../components/DeviceManageComponents';
 import { BrowseScreen } from '../components/BrowseScreen';
 import { ActivityStreamScreen, SnapshotScreen, SettingsHomeScreen } from '../components/NvrSecondaryScreens';
-import { RecordingPreviewDialog, DeleteSnapshotConfirmDialog } from '../components/NvrDialogComponents';
+import { RecordingPreviewDialog, DeleteSnapshotConfirmDialog, ConfirmActionDialog, SetPinDialog } from '../components/NvrDialogComponents';
 import { NvrUiState, copyUiState } from '../viewmodel/NvrUiState';
 
 function safeShowToast(message: string): void {
@@ -95,9 +95,12 @@ struct MainPage {
   @State isAppLocked: boolean = false;
   @State pinInput: string = '';
   @State isInitializing: boolean = true;
+  @State showSetPinDialog: boolean = false;
+  @State pendingClearRecordingsConfirm: boolean = false;
   private pollTimerId: number = -1;
   private controlsTimerId: number = -1;
   private videoPollTimerId: number = -1;
+  private healthCheckTimerId: number = -1;
   private abilityContext: common.Context | null = null;
   private isPageHidden: boolean = false;
 
@@ -112,6 +115,7 @@ struct MainPage {
     if (this.pollTimerId !== -1) clearTimeout(this.pollTimerId);
     if (this.controlsTimerId !== -1) clearTimeout(this.controlsTimerId);
     if (this.videoPollTimerId !== -1) clearTimeout(this.videoPollTimerId);
+    if (this.healthCheckTimerId !== -1) clearTimeout(this.healthCheckTimerId);
     if (this.vm) {
       this.vm.shutdown();
     }
@@ -167,7 +171,8 @@ struct MainPage {
       this.pollPlaybackState();
     }, 250);
     // Health check every 30 seconds
-    setInterval(() => {
+    if (this.healthCheckTimerId !== -1) clearTimeout(this.healthCheckTimerId);
+    this.healthCheckTimerId = setInterval(() => {
       if (this.vm) {
         this.vm.checkCameraHealth().then(() => this.syncState());
       }
@@ -401,12 +406,12 @@ struct MainPage {
                     onRtmpAudioEnabledChange: (v: boolean) => { this.vm?.onRtmpAudioEnabledChange(v); this.syncState(); },
                     onRtmpAutoStreamChange: (v: boolean) => { this.vm?.onRtmpAutoStreamChange(v); this.syncState(); },
                     onBgPlaybackChange: (v: boolean) => { this.vm?.onBgPlaybackChange(v); this.syncState(); },
-                    onClearRecordings: () => { this.vm?.clearRecordings(); this.syncState(); },
+                    onClearRecordings: () => { this.pendingClearRecordingsConfirm = true; },
                     onManageRtmpSettings: () => safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_rtmp_configure_hint')),
                     appLockEnabled: this.uiState.appLockEnabled ?? false,
                     onAppLockChange: (enabled: boolean) => {
                       if (enabled) {
-                        this.vm?.setAppLock(true, '1234').then(() => this.syncState());
+                        this.showSetPinDialog = true;
                       } else {
                         this.vm?.setAppLock(false).then(() => this.syncState());
                       }
@@ -526,6 +531,53 @@ struct MainPage {
         .backgroundColor('#99000000')
         .onClick(() => { this.vm?.onPendingDeleteSnapshotChange(null); this.syncState(); })
       }
+
+      if (this.showSetPinDialog) {
+        Column() {
+          SetPinDialog({
+            accentColor: this.colors.primary,
+            errorColor: this.colors.error,
+            onDismiss: () => { this.showSetPinDialog = false; },
+            onConfirm: (pin: string) => {
+              this.vm?.setAppLock(true, pin).then(() => {
+                this.showSetPinDialog = false;
+                safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_pin_set_success'));
+                this.syncState();
+              });
+            },
+          })
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .backgroundColor('#99000000')
+        .onClick(() => { this.showSetPinDialog = false; })
+      }
+
+      if (this.pendingClearRecordingsConfirm) {
+        Column() {
+          ConfirmActionDialog({
+            title: getContext(this).resourceManager.getStringByNameSync('dialog_clear_recordings_title'),
+            message: getContext(this).resourceManager.getStringByNameSync('dialog_clear_recordings_message'),
+            confirmLabel: getContext(this).resourceManager.getStringByNameSync('dialog_delete'),
+            cancelLabel: getContext(this).resourceManager.getStringByNameSync('dialog_cancel'),
+            accentColor: this.colors.primary,
+            errorColor: this.colors.error,
+            onDismiss: () => { this.pendingClearRecordingsConfirm = false; },
+            onConfirmAction: () => {
+              this.pendingClearRecordingsConfirm = false;
+              this.vm?.clearRecordings().then(() => this.syncState());
+            },
+          })
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .backgroundColor('#99000000')
+        .onClick(() => { this.pendingClearRecordingsConfirm = false; })
+      }
     }
     .width('100%')
     .height('100%')
@@ -536,8 +588,9 @@ struct MainPage {
   @Builder
   AppLockScreen() {
     Column() {
-      Text('🔒')
+      SymbolGlyph($r('sys.symbol.lock_fill'))
         .fontSize(48)
+        .fontColor([this.colors.onBackground])
         .margin({ bottom: 20 })
 
       Text($r('app.string.enter_pin'))
@@ -600,10 +653,8 @@ struct MainPage {
         });
       },
       onMenuClick: () => {
-        this.vm?.reloadCameras().then(() => {
-          const cam = this.getSelectedCameraForGrid() ?? this.cameras[0] ?? null;
-          this.vm?.openEditForm(cam).then(() => this.syncState());
-        });
+        this.vm?.onSelectedTabChange(4);
+        this.syncState();
       },
       onAddClick: () => this.onAddCamera(),
     })
@@ -817,11 +868,9 @@ struct MainPage {
         }
         this.vm?.saveSnapshot(cameraId, cameraName).then(() => this.syncState());
       },
-      onMore: () => safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_more_coming')),
       onToggleRecord: () => { this.vm?.toggleRecording().then(() => this.syncState()); },
       onSwipeLeft: () => this.switchCamera(1),
       onSwipeRight: () => this.switchCamera(-1),
-      onPtzCommand: (cmd: string) => safeShowToast(`PTZ: ${cmd}`),
     })
   }
 

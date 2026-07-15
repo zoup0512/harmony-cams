@@ -312,6 +312,17 @@
     { "name": "dialog_browse_path_title", "value": "选择存储目录" },
     { "name": "browse_parent_dir", "value": "返回上级" },
     { "name": "browse_select_current", "value": "选择此目录" },
-    { "name": "browse_empty", "value": "没有子目录" }
+    { "name": "browse_empty", "value": "没有子目录" },
+
+    { "name": "dialog_set_pin_title", "value": "设置解锁 PIN" },
+    { "name": "dialog_set_pin_hint", "value": "输入 4 位数字 PIN" },
+    { "name": "dialog_confirm_pin_hint", "value": "再次输入 PIN 进行确认" },
+    { "name": "toast_pin_invalid_length", "value": "PIN 需为 4 位数字" },
+    { "name": "toast_pin_mismatch", "value": "两次输入的 PIN 不一致" },
+    { "name": "toast_pin_set_success", "value": "应用锁已开启" },
+    { "name": "dialog_clear_recordings_title", "value": "清空所有录像？" },
+    { "name": "dialog_clear_recordings_message", "value": "此操作将永久删除所有本地录像文件，且无法恢复。" },
+    { "name": "network_source_url_placeholder", "value": "rtsp://, http://, rtmp://, smb:// ..." },
+    { "name": "username_placeholder_admin", "value": "admin" }
   ]
 }

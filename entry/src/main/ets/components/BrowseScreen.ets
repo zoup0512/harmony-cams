@@ -53,10 +53,11 @@ export struct BrowseScreen {
     Column() {
         // Top bar
         Row() {
-          Text('🎥')
-            .fontSize(28)
+          SymbolGlyph($r('sys.symbol.video_fill'))
+            .fontSize(26)
+            .fontColor([this.onSurfaceColor])
             .margin({ right: 8 })
-          Text('VLC')
+          Text($r('app.string.tab_browse'))
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.onSurfaceColor)
@@ -67,15 +68,11 @@ export struct BrowseScreen {
               .height(20)
               .color(this.accentColor)
           } else {
-            Text('🔄')
+            SymbolGlyph($r('sys.symbol.arrow_clockwise'))
               .fontSize(22)
-              .fontColor(this.accentColor)
+              .fontColor([this.accentColor])
               .onClick(() => this.startScan())
           }
-          Text('⋮')
-            .fontSize(22)
-            .fontColor(this.onSurfaceVariantColor)
-            .margin({ left: 12 })
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)
@@ -100,8 +97,9 @@ export struct BrowseScreen {
         } else {
           ForEach(this.favorites, (fav: BrowseFavorite) => {
             Row() {
-              Text(fav.source === BrowseSourceKind.LOCAL_FILE ? '📁' : '🌐')
-                .fontSize(28)
+              SymbolGlyph(fav.source === BrowseSourceKind.LOCAL_FILE ? $r('sys.symbol.folder_fill') : $r('sys.symbol.link'))
+                .fontSize(26)
+                .fontColor([this.onSurfaceColor])
                 .margin({ right: 12 })
               Column() {
                 Text(fav.title)
@@ -116,9 +114,9 @@ export struct BrowseScreen {
               }
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
-              Text('✕')
+              SymbolGlyph($r('sys.symbol.xmark'))
                 .fontSize(16)
-                .fontColor(this.onSurfaceVariantColor)
+                .fontColor([this.onSurfaceVariantColor])
                 .onClick(() => this.removeFavorite(fav.id))
             }
             .width('100%')
@@ -179,9 +177,9 @@ export struct BrowseScreen {
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
 
-              Text('▶')
+              SymbolGlyph($r('sys.symbol.play_fill'))
                 .fontSize(18)
-                .fontColor(this.accentColor)
+                .fontColor([this.accentColor])
                 .margin({ left: 10 })
             }
             .width('100%')
@@ -209,7 +207,7 @@ export struct BrowseScreen {
             .margin({ top: 12 })
             .onChange((v: string) => { this.titleInput = v; })
 
-          TextInput({ text: this.urlInput, placeholder: 'rtsp://, http://, rtmp://, smb:// ...' })
+          TextInput({ text: this.urlInput, placeholder: $r('app.string.network_source_url_placeholder') })
             .fontSize(14)
             .fontColor(this.onSurfaceColor)
             .backgroundColor(this.surfaceVariantColor)
@@ -291,14 +289,14 @@ export struct BrowseScreen {
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
 
-              Text('▶')
+              SymbolGlyph($r('sys.symbol.play_fill'))
                 .fontSize(18)
-                .fontColor(this.accentColor)
+                .fontColor([this.accentColor])
                 .margin({ left: 10 })
 
-              Text('✕')
+              SymbolGlyph($r('sys.symbol.xmark'))
                 .fontSize(16)
-                .fontColor(this.onSurfaceVariantColor)
+                .fontColor([this.onSurfaceVariantColor])
                 .margin({ left: 10 })
                 .onClick(() => this.removeNetworkSource(src.id))
             }

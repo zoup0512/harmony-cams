@@ -410,12 +410,14 @@ export struct SnapshotScreen {
                 })
 
               Row() {
-                Text('📤')
+                SymbolGlyph($r('sys.symbol.share'))
                   .fontSize(18)
+                  .fontColor(['#FFFFFF'])
                   .margin({ right: 12 })
                   .onClick(() => this.onShareSnapshot(snapshot))
-                Text('🗑')
+                SymbolGlyph($r('sys.symbol.trash_fill'))
                   .fontSize(18)
+                  .fontColor(['#FFFFFF'])
                   .onClick(() => this.onDeleteSnapshot(snapshot))
               }
               .padding({ right: 12, bottom: 10 })
@@ -608,6 +610,7 @@ export struct SettingsHomeScreen {
               .fontSize(14)
               .fontColor(this.onSurfaceColor)
               .backgroundColor(Color.Transparent)
+              .type(InputType.Number)
               .width('100%')
               .margin({ top: 6 })
               .onChange((v: string) => this.onRecordingDurationChange(v))
