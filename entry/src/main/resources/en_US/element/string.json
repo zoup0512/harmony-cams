@@ -269,6 +269,7 @@
     { "name": "unknown_camera_name", "value": "unknown" },
     { "name": "reason_read_media", "value": "For reading recording and snapshot files" },
     { "name": "reason_write_media", "value": "For saving recordings and snapshots to media storage" },
+    { "name": "reason_read_write_documents", "value": "For saving recordings and snapshots in the Documents directory" },
     { "name": "reason_camera", "value": "For phone camera live streaming" },
     { "name": "reason_microphone", "value": "For capturing audio during live streaming" },
 
@@ -346,6 +347,12 @@
     { "name": "dialog_clear_recordings_title", "value": "Clear all recordings?" },
     { "name": "dialog_clear_recordings_message", "value": "This will permanently delete all local recording files. This action cannot be undone." },
     { "name": "network_source_url_placeholder", "value": "rtsp://, http://, rtmp://, smb:// ..." },
-    { "name": "username_placeholder_admin", "value": "admin" }
+    { "name": "username_placeholder_admin", "value": "admin" },
+    { "name": "person_detection", "value": "Person Detection" },
+    { "name": "person_detected", "value": "Person Detected" },
+    { "name": "person_detection_idle", "value": "Monitoring" },
+    { "name": "person_event_log", "value": "Detection Events" },
+    { "name": "person_no_events", "value": "No events yet" },
+    { "name": "scan_to_connect", "value": "Scan to connect" }
   ]
 }

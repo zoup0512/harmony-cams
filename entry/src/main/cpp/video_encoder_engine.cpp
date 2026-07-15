@@ -122,7 +122,6 @@ void VideoEncoderEngine::stop()
 void VideoEncoderEngine::release()
 {
     running_ = false;
-    motionEnabled_ = false;
     if (encoder_ != nullptr) {
         OH_VideoEncoder_Destroy(encoder_);
         encoder_ = nullptr;
@@ -133,11 +132,6 @@ void VideoEncoderEngine::release()
         napi_release_threadsafe_function(tsfn_, napi_tsfn_abort);
         tsfn_ = nullptr;
     }
-    if (motionTsfn_ != nullptr) {
-        napi_release_threadsafe_function(motionTsfn_, napi_tsfn_abort);
-        motionTsfn_ = nullptr;
-    }
-    pFrameAvgSize_ = 0.0f;
     LOGI("Encoder released");
 }
 
@@ -149,34 +143,6 @@ void VideoEncoderEngine::setCallback(napi_env env, napi_value callback)
     napi_create_threadsafe_function(env, callback, nullptr, resourceName,
         0, 1, nullptr, nullptr, this,
         &VideoEncoderEngine::callJsCallback, &tsfn_);
-}
-
-void VideoEncoderEngine::setMotionDetection(bool enabled, float threshold)
-{
-    motionEnabled_ = enabled;
-    if (enabled) {
-        motionThreshold_ = threshold;
-        pFrameAvgSize_ = 0.0f;
-        lastMotionTimeMs_ = 0;
-        LOGI("Motion detection enabled, threshold=%{public}d", (int)threshold);
-    } else {
-        LOGI("Motion detection disabled");
-    }
-}
-
-void VideoEncoderEngine::setMotionCallback(napi_env env, napi_value callback)
-{
-    if (motionTsfn_ != nullptr) {
-        napi_release_threadsafe_function(motionTsfn_, napi_tsfn_abort);
-        motionTsfn_ = nullptr;
-    }
-    napi_value resourceName;
-    napi_create_string_utf8(env, "MotionEventCallback", NAPI_AUTO_LENGTH, &resourceName);
-
-    napi_create_threadsafe_function(env, callback, nullptr, resourceName,
-        0, 1, nullptr, nullptr, this,
-        &VideoEncoderEngine::callJsMotionCallback, &motionTsfn_);
-    LOGI("Motion callback registered, tsfn=%{public}s", motionTsfn_ ? "OK" : "NULL");
 }
 
 void VideoEncoderEngine::onError(OH_AVCodec* codec, int32_t errorCode, void* userData)
@@ -228,18 +194,13 @@ void VideoEncoderEngine::handleOutputBuffer(uint32_t index, OH_AVBuffer* buffer)
 
     static int outputCount = 0;
     if (outputCount < 5 || (outputCount % 30) == 0) {
-        LOGI("handleOutputBuffer: count=%{public}d, size=%{public}d, pts=%{public}lld, flags=%{public}u, motionEnabled=%{public}d", outputCount, attr.size, (long long)attr.pts, attr.flags, motionEnabled_ ? 1 : 0);
+        LOGI("handleOutputBuffer: count=%{public}d, size=%{public}d, pts=%{public}lld, flags=%{public}u", outputCount, attr.size, (long long)attr.pts, attr.flags);
     }
     outputCount++;
 
     // Extract SPS/PPS from the format metadata if available
     if (attr.flags & AVCODEC_BUFFER_FLAGS_CODEC_DATA) {
         LOGI("handleOutputBuffer: received codec data (SPS/PPS), size=%{public}d", attr.size);
-    }
-
-    // Motion detection: analyze P-frame size
-    if (motionEnabled_ && running_) {
-        checkMotion(attr.size, attr.flags);
     }
 
     // Copy data and send to JS callback
@@ -257,94 +218,6 @@ void VideoEncoderEngine::handleOutputBuffer(uint32_t index, OH_AVBuffer* buffer)
     }
 
     OH_VideoEncoder_FreeOutputBuffer(encoder_, index);
-}
-
-void VideoEncoderEngine::checkMotion(int32_t frameSize, uint32_t flags)
-{
-    // Skip I-frames and codec data — only analyze P-frames
-    if (flags & AVCODEC_BUFFER_FLAGS_SYNC_FRAME || flags & AVCODEC_BUFFER_FLAGS_CODEC_DATA) {
-        return;
-    }
-
-    static int32_t pFrameCount = 0;
-    pFrameCount++;
-
-    // Initialize or update exponential moving average of P-frame size
-    if (pFrameAvgSize_ < 1.0f) {
-        pFrameAvgSize_ = (float)frameSize;
-        LOGI("checkMotion: first P-frame, size=%{public}d, avg initialized", frameSize);
-        return;
-    }
-
-    pFrameAvgSize_ = pFrameAvgSize_ * 0.9f + (float)frameSize * 0.1f;
-
-    // Periodic log every 100 P-frames to show detection is alive
-    if (pFrameCount % 100 == 0) {
-        LOGI("checkMotion: alive, pFrameCount=%{public}d, avgSize=%{public}d, threshold=%{public}d, tsfn=%{public}s",
-             pFrameCount, (int)pFrameAvgSize_, (int)motionThreshold_, motionTsfn_ ? "OK" : "NULL");
-    }
-
-    // Check if current P-frame is significantly larger than average
-    if (pFrameAvgSize_ < 100.0f) return;  // too small, not enough data
-
-    float ratio = (float)frameSize / pFrameAvgSize_;
-    if (ratio < motionThreshold_) return;
-
-    // Cooldown check
-    int64_t now = GetNowMs();
-    if (now - lastMotionTimeMs_ < motionCooldownMs_) {
-        LOGI("checkMotion: motion detected but in cooldown, remaining=%{public}lldms",
-             (long long)(motionCooldownMs_ - (now - lastMotionTimeMs_)));
-        return;
-    }
-    lastMotionTimeMs_ = now;
-
-    LOGI("Motion detected: frameSize=%{public}d, avgSize=%{public}d, ratio=%{public}d, threshold=%{public}d",
-         frameSize, (int)pFrameAvgSize_, (int)ratio, (int)motionThreshold_);
-
-    if (motionTsfn_ != nullptr) {
-        auto* evtData = new MotionEventData();
-        evtData->timestamp = now;
-        evtData->frameSize = frameSize;
-        evtData->avgSize = (int32_t)pFrameAvgSize_;
-        evtData->ratio = ratio;
-        napi_call_threadsafe_function(motionTsfn_, evtData, napi_tsfn_nonblocking);
-    } else {
-        LOGE("checkMotion: motionTsfn_ is NULL, cannot send event to JS");
-    }
-}
-
-void VideoEncoderEngine::callJsMotionCallback(napi_env env, napi_value jsCb, void* context, void* data)
-{
-    auto* evtData = static_cast<MotionEventData*>(data);
-    if (evtData == nullptr) return;
-
-    napi_value callback = jsCb;
-    napi_value undefined;
-    napi_get_undefined(env, &undefined);
-
-    napi_value obj;
-    napi_create_object(env, &obj);
-
-    napi_value tsVal;
-    napi_create_int64(env, evtData->timestamp, &tsVal);
-    napi_set_named_property(env, obj, "timestamp", tsVal);
-
-    napi_value fsVal;
-    napi_create_int32(env, evtData->frameSize, &fsVal);
-    napi_set_named_property(env, obj, "frameSize", fsVal);
-
-    napi_value avgVal;
-    napi_create_int32(env, evtData->avgSize, &avgVal);
-    napi_set_named_property(env, obj, "avgSize", avgVal);
-
-    napi_value ratioVal;
-    napi_create_double(env, evtData->ratio, &ratioVal);
-    napi_set_named_property(env, obj, "ratio", ratioVal);
-
-    napi_call_function(env, undefined, callback, 1, &obj, nullptr);
-
-    delete evtData;
 }
 
 // Thread-safe function to call JS callback

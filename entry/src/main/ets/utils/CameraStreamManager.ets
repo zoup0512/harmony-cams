@@ -1,11 +1,13 @@
 import { camera } from '@kit.CameraKit';
 import { common, abilityAccessCtrl, Permissions } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
+import { image } from '@kit.ImageKit';
+import { objectDetection, visionBase } from '@kit.CoreVisionKit';
 import { RtspServer } from './RtspServer';
 import { RtmpPushManager, RtmpPushConfig, parseRtmpUrl, RtmpPushStatus } from './RtmpPushManager';
 import { PHONE_RTSP_PORT } from './NetworkUtils';
 import { rstr, rstrNum } from './I18nUtils';
-import { createEncoder, startEncoder, stopEncoder, releaseEncoder, EncodedFrame, setMotionDetection, setMotionCallback, MotionEvent } from 'librtspencoder.so';
+import { createEncoder, startEncoder, stopEncoder, releaseEncoder, EncodedFrame } from 'librtspencoder.so';
 
 const TAG = 'CameraStreamManager';
 
@@ -14,14 +16,14 @@ export interface StreamStatus {
   isPreviewReady: boolean;
   statusText: string;
   clientCount: number;
-  motionDetected: boolean;
-  motionEvents: MotionEventLog[];
+  personDetected: boolean;
+  personEvents: PersonEventLog[];
 }
 
-export interface MotionEventLog {
+export interface PersonEventLog {
   timestamp: number;
-  frameSize: number;
-  ratio: number;
+  confidence: number;
+  bounds: string;
 }
 
 export class CameraStreamManager {
@@ -42,11 +44,16 @@ export class CameraStreamManager {
   private streaming: boolean = false;
   private previewReady: boolean = false;
   private statusCallback: ((status: StreamStatus) => void) | null = null;
-  private motionEnabled: boolean = false;
-  private motionThreshold: number = 3.0;
-  private motionEvents: MotionEventLog[] = [];
-  private motionDetected: boolean = false;
+  private personDetectionEnabled: boolean = false;
+  private personEvents: PersonEventLog[] = [];
+  private personDetected: boolean = false;
   private pausedForBackground: boolean = false;
+  private imageReceiver: image.ImageReceiver | null = null;
+  private detectionPreviewOutput: camera.PreviewOutput | null = null;
+  private detector: objectDetection.ObjectDetector | null = null;
+  private lastDetectionTimeMs: number = 0;
+  private detectionThrottleMs: number = 1000;
+  private imageArrivalCount: number = 0;
 
   private width: number = 640;
   private height: number = 480;
@@ -84,38 +91,52 @@ export class CameraStreamManager {
     console.info(`${TAG} RTMP config: host=${parsed.host}, port=${parsed.port}, app=${parsed.app}, key=${streamKey}`);
   }
 
-  setMotionEnabled(enabled: boolean): void {
-    this.motionEnabled = enabled;
-    console.info(`${TAG} setMotionEnabled: ${enabled}, streaming=${this.streaming}, threshold=${this.motionThreshold}`);
-    if (this.streaming) {
-      if (enabled) {
-        setMotionCallback((event: MotionEvent) => {
-          this.onMotionEvent(event);
-        });
-        console.info(`${TAG} setMotionEnabled: registered motion callback`);
-      }
-      setMotionDetection(enabled, this.motionThreshold);
-      console.info(`${TAG} setMotionEnabled: called native setMotionDetection(${enabled}, ${this.motionThreshold})`);
+  setPersonDetectionEnabled(enabled: boolean): void {
+    this.personDetectionEnabled = enabled;
+    console.info(`${TAG} setPersonDetectionEnabled: ${enabled}, streaming=${this.streaming}`);
+    if (enabled) {
+      this.initDetector().then(() => {
+        console.info(`${TAG} setPersonDetectionEnabled: detector ready`);
+      }).catch((e: Error) => {
+        console.error(`${TAG} setPersonDetectionEnabled: initDetector failed: ${e.message}`);
+      });
     } else {
-      console.info(`${TAG} setMotionEnabled: not streaming, will apply on startStream`);
-    }
-    if (!enabled) {
-      this.motionDetected = false;
+      this.personDetected = false;
+      this.destroyDetector().then(() => {
+        console.info(`${TAG} setPersonDetectionEnabled: detector destroyed`);
+      });
     }
     this.notifyStatus();
   }
 
-  setMotionThreshold(threshold: number): void {
-    this.motionThreshold = threshold;
-    console.info(`${TAG} setMotionThreshold: ${threshold}, streaming=${this.streaming}, motionEnabled=${this.motionEnabled}`);
-    if (this.streaming && this.motionEnabled) {
-      setMotionDetection(true, threshold);
-      console.info(`${TAG} setMotionThreshold: called native setMotionDetection(true, ${threshold})`);
+  async initDetector(): Promise<void> {
+    if (this.detector) {
+      console.info(`${TAG} initDetector: detector already exists`);
+      return;
+    }
+    try {
+      console.info(`${TAG} initDetector: creating ObjectDetector...`);
+      this.detector = await objectDetection.ObjectDetector.create();
+      console.info(`${TAG} initDetector: ObjectDetector created`);
+    } catch (e) {
+      console.error(`${TAG} initDetector failed: ${(e as Error).message}`);
     }
   }
 
-  getMotionEvents(): MotionEventLog[] {
-    return this.motionEvents;
+  async destroyDetector(): Promise<void> {
+    if (this.detector) {
+      try {
+        await this.detector.destroy();
+        console.info(`${TAG} destroyDetector: ObjectDetector destroyed`);
+      } catch (e) {
+        console.error(`${TAG} destroyDetector failed: ${(e as Error).message}`);
+      }
+      this.detector = null;
+    }
+  }
+
+  getPersonEvents(): PersonEventLog[] {
+    return this.personEvents;
   }
 
   isFrontCamera(): boolean {
@@ -131,8 +152,8 @@ export class CameraStreamManager {
         isPreviewReady: this.previewReady,
         statusText: this.getStatusText(),
         clientCount: clientCount,
-        motionDetected: this.motionDetected,
-        motionEvents: this.motionEvents,
+        personDetected: this.personDetected,
+        personEvents: this.personEvents,
       });
     }
   }
@@ -186,8 +207,8 @@ export class CameraStreamManager {
           isPreviewReady: false,
           statusText: rstr(this.context, 'cam_status_need_camera_permission'),
           clientCount: 0,
-          motionDetected: false,
-          motionEvents: this.motionEvents,
+          personDetected: false,
+          personEvents: this.personEvents,
         });
         return;
       }
@@ -206,8 +227,8 @@ export class CameraStreamManager {
           isPreviewReady: false,
           statusText: rstr(this.context, 'cam_status_no_camera'),
           clientCount: 0,
-          motionDetected: false,
-          motionEvents: this.motionEvents,
+          personDetected: false,
+          personEvents: this.personEvents,
         });
         return;
       }
@@ -232,6 +253,36 @@ export class CameraStreamManager {
       this.previewOutput = this.cameraManager.createPreviewOutput(previewProfile, previewSurfaceId);
       console.info(`${TAG} initPreview: PreviewOutput created`);
 
+      // Create ImageReceiver for person detection (dual-channel preview)
+      const detWidth = 320;
+      const detHeight = 240;
+      try {
+        console.info(`${TAG} initPreview: creating ImageReceiver ${detWidth}x${detHeight}...`);
+        this.imageReceiver = image.createImageReceiver(
+          { width: detWidth, height: detHeight },
+          image.ImageFormat.JPEG, 8);
+        const receiverSurfaceId = await this.imageReceiver.getReceivingSurfaceId();
+        console.info(`${TAG} initPreview: ImageReceiver surfaceId=${receiverSurfaceId}`);
+
+        const detPreviewProfile = outputCapability.previewProfiles.find((p: camera.Profile) => {
+          return p.size.width === detWidth && p.size.height === detHeight;
+        }) ?? outputCapability.previewProfiles[0];
+        this.detectionPreviewOutput = this.cameraManager.createPreviewOutput(detPreviewProfile, receiverSurfaceId);
+        console.info(`${TAG} initPreview: detection PreviewOutput created`);
+
+        this.imageReceiver.on('imageArrival', () => {
+          this.imageArrivalCount++;
+          if (this.imageArrivalCount % 100 === 1) {
+            console.info(`${TAG} imageArrival callback #${this.imageArrivalCount}, detectionEnabled=${this.personDetectionEnabled}`);
+          }
+          this.onDetectionFrame();
+        });
+      } catch (e) {
+        console.warn(`${TAG} initPreview: ImageReceiver creation failed (detection disabled): ${(e as Error).message}`);
+        this.imageReceiver = null;
+        this.detectionPreviewOutput = null;
+      }
+
       console.info(`${TAG} initPreview: creating VideoSession...`);
       this.session = this.cameraManager.createSession(camera.SceneMode.NORMAL_VIDEO) as camera.VideoSession;
       console.info(`${TAG} initPreview: VideoSession created: ${this.session !== null}`);
@@ -242,8 +293,8 @@ export class CameraStreamManager {
           isPreviewReady: false,
           statusText: rstr(this.context, 'cam_status_session_failed'),
           clientCount: 0,
-          motionDetected: false,
-          motionEvents: this.motionEvents,
+          personDetected: false,
+          personEvents: this.personEvents,
         });
         return;
       }
@@ -253,6 +304,10 @@ export class CameraStreamManager {
       this.session.addInput(this.cameraInput);
       console.info(`${TAG} initPreview: addOutput(preview)...`);
       this.session.addOutput(this.previewOutput);
+      if (this.detectionPreviewOutput) {
+        console.info(`${TAG} initPreview: addOutput(detection preview)...`);
+        this.session.addOutput(this.detectionPreviewOutput);
+      }
 
       console.info(`${TAG} initPreview: commitConfig...`);
       await this.session.commitConfig();
@@ -271,8 +326,8 @@ export class CameraStreamManager {
         isPreviewReady: false,
         statusText: rstr(this.context, 'cam_status_preview_init_failed', err.message),
         clientCount: 0,
-        motionDetected: false,
-        motionEvents: this.motionEvents,
+        personDetected: false,
+        personEvents: this.personEvents,
       });
     }
   }
@@ -303,8 +358,8 @@ export class CameraStreamManager {
             isPreviewReady: this.previewReady,
             statusText: rstr(this.context, 'cam_status_configure_rtmp'),
             clientCount: 0,
-            motionDetected: false,
-            motionEvents: this.motionEvents,
+            personDetected: false,
+            personEvents: this.personEvents,
           });
           return;
         }
@@ -369,14 +424,11 @@ export class CameraStreamManager {
       startEncoder();
       console.info(`${TAG} startStream: encoder started`);
 
-      if (this.motionEnabled) {
-        setMotionCallback((event: MotionEvent) => {
-          this.onMotionEvent(event);
-        });
-        setMotionDetection(true, this.motionThreshold);
-        console.info(`${TAG} startStream: motion detection enabled, threshold=${this.motionThreshold}`);
+      if (this.personDetectionEnabled) {
+        await this.initDetector();
+        console.info(`${TAG} startStream: person detection enabled`);
       } else {
-        console.info(`${TAG} startStream: motion detection NOT enabled (motionEnabled=false)`);
+        console.info(`${TAG} startStream: person detection NOT enabled`);
       }
 
       this.streaming = true;
@@ -390,8 +442,8 @@ export class CameraStreamManager {
         isPreviewReady: this.previewReady,
         statusText: rstr(this.context, 'cam_status_start_failed', err.message),
         clientCount: 0,
-        motionDetected: false,
-        motionEvents: this.motionEvents,
+        personDetected: false,
+        personEvents: this.personEvents,
       });
     }
   }
@@ -402,11 +454,8 @@ export class CameraStreamManager {
       this.streaming = false;
       this.pausedForBackground = false;
 
-      if (this.motionEnabled) {
-        setMotionDetection(false, 0);
-        console.info(`${TAG} stopStream: motion detection disabled via native`);
-      }
-      this.motionDetected = false;
+      this.personDetected = false;
+      await this.destroyDetector();
 
       stopEncoder();
 
@@ -453,10 +502,7 @@ export class CameraStreamManager {
     try {
       this.pausedForBackground = true;
 
-      if (this.motionEnabled) {
-        console.info(`${TAG} pauseStream: disabling motion detection`);
-        setMotionDetection(false, 0);
-      }
+      this.personDetected = false;
 
       console.info(`${TAG} pauseStream: stopping encoder...`);
       stopEncoder();
@@ -494,6 +540,14 @@ export class CameraStreamManager {
       if (this.previewOutput) {
         try { this.previewOutput.release(); } catch (e) {}
         this.previewOutput = null;
+      }
+      if (this.detectionPreviewOutput) {
+        try { this.detectionPreviewOutput.release(); } catch (e) {}
+        this.detectionPreviewOutput = null;
+      }
+      if (this.imageReceiver) {
+        try { this.imageReceiver.release(); } catch (e) {}
+        this.imageReceiver = null;
       }
       this.previewReady = false;
 
@@ -572,13 +626,10 @@ export class CameraStreamManager {
       startEncoder();
       console.info(`${TAG} resumeStream: encoder started`);
 
-      // Step 5: Re-enable motion detection if needed
-      if (this.motionEnabled) {
-        setMotionCallback((event: MotionEvent) => {
-          this.onMotionEvent(event);
-        });
-        setMotionDetection(true, this.motionThreshold);
-        console.info(`${TAG} resumeStream: motion detection re-enabled`);
+      // Step 5: Re-enable person detection if needed
+      if (this.personDetectionEnabled) {
+        await this.initDetector();
+        console.info(`${TAG} resumeStream: person detection re-enabled`);
       }
 
       console.info(`${TAG} resumeStream END: success`);
@@ -589,22 +640,104 @@ export class CameraStreamManager {
     }
   }
 
-  private onMotionEvent(event: MotionEvent): void {
-    console.info(`${TAG} onMotionEvent: timestamp=${event.timestamp}, frameSize=${event.frameSize}, avgSize=${event.avgSize}, ratio=${event.ratio.toFixed(2)}`);
-    const log: MotionEventLog = {
-      timestamp: event.timestamp,
-      frameSize: event.frameSize,
-      ratio: event.ratio,
-    };
-    this.motionEvents.unshift(log);
-    if (this.motionEvents.length > 50) {
-      this.motionEvents = this.motionEvents.slice(0, 50);
+  private async onDetectionFrame(): Promise<void> {
+    if (!this.imageReceiver) {
+      return;
     }
-    this.motionDetected = true;
+
+    const now = Date.now();
+    const shouldDetect = this.personDetectionEnabled && this.detector &&
+      (now - this.lastDetectionTimeMs >= this.detectionThrottleMs);
+
+    if (!shouldDetect) {
+      try {
+        const imgObj = await this.imageReceiver.readNextImage();
+        if (imgObj) {
+          imgObj.release();
+        }
+      } catch (e) {
+      }
+      return;
+    }
+
+    this.lastDetectionTimeMs = now;
+    console.info(`${TAG} onDetectionFrame: running detection, arrivalCount=${this.imageArrivalCount}`);
+
+    try {
+      const imgObj = await this.imageReceiver.readNextImage();
+      if (!imgObj) {
+        console.warn(`${TAG} onDetectionFrame: readNextImage returned null`);
+        return;
+      }
+
+      const component = await imgObj.getComponent(image.ComponentType.JPEG);
+      if (!component || !component.byteBuffer) {
+        console.warn(`${TAG} onDetectionFrame: no JPEG component`);
+        imgObj.release();
+        return;
+      }
+
+      const imageSource = image.createImageSource(component.byteBuffer);
+      const pixelMap = await imageSource.createPixelMap({
+        desiredSize: { width: 320, height: 240 },
+      });
+
+      const request: visionBase.Request = {
+        inputData: { pixelMap: pixelMap },
+      };
+
+      if (!this.detector) {
+        imgObj.release();
+        pixelMap.release();
+        imageSource.release();
+        return;
+      }
+
+      const response = await this.detector.process(request);
+      imgObj.release();
+      pixelMap.release();
+      imageSource.release();
+
+      const objCount = response?.objects?.length ?? 0;
+      console.info(`${TAG} onDetectionFrame: detection result, objects=${objCount}`);
+
+      if (objCount > 0) {
+        for (const obj of response.objects) {
+          const labels = obj.labels ?? [];
+          console.info(`${TAG} onDetectionFrame: obj labels=${JSON.stringify(labels)}, score=${obj.score}`);
+          const isPerson = labels.includes(13) || labels.includes(8) || labels.includes(5);
+          if (isPerson) {
+            this.onPersonDetected(now, obj.score, obj.boundingBox);
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      console.error(`${TAG} onDetectionFrame error: ${(e as Error).message}`);
+    }
+  }
+
+  private onPersonDetected(timestamp: number, confidence: number, bounds: visionBase.BoundingBox): void {
+    const boundsStr = `(${bounds.left},${bounds.top}),${bounds.width}x${bounds.height}`;
+    console.info(`${TAG} onPersonDetected: ts=${timestamp}, confidence=${confidence.toFixed(2)}, bounds=${boundsStr}`);
+
+    const log: PersonEventLog = {
+      timestamp: timestamp,
+      confidence: confidence,
+      bounds: boundsStr,
+    };
+    this.personEvents.unshift(log);
+    if (this.personEvents.length > 50) {
+      this.personEvents = this.personEvents.slice(0, 50);
+    }
+    this.personDetected = true;
     this.notifyStatus();
 
+    this.rtspServer.broadcastNotification('person_detected',
+      JSON.stringify({ timestamp, confidence: confidence.toFixed(2), bounds: boundsStr }));
+
     setTimeout(() => {
-      this.motionDetected = false;
+      this.personDetected = false;
       this.notifyStatus();
     }, 2000);
   }
@@ -643,6 +776,18 @@ export class CameraStreamManager {
           console.warn(`${TAG} switchCamera: previewOutput.release() error: ${(e as Error).message}`);
         }
         this.previewOutput = null;
+      }
+      if (this.detectionPreviewOutput) {
+        try { this.detectionPreviewOutput.release(); } catch (e) {
+          console.warn(`${TAG} switchCamera: detectionPreviewOutput.release() error: ${(e as Error).message}`);
+        }
+        this.detectionPreviewOutput = null;
+      }
+      if (this.imageReceiver) {
+        try { this.imageReceiver.release(); } catch (e) {
+          console.warn(`${TAG} switchCamera: imageReceiver.release() error: ${(e as Error).message}`);
+        }
+        this.imageReceiver = null;
       }
       this.previewReady = false;
       console.info(`${TAG} switchCamera: old camera resources released`);
@@ -768,6 +913,7 @@ export class CameraStreamManager {
 
   async release(): Promise<void> {
     await this.stopStream();
+    await this.destroyDetector();
 
     if (this.session) {
       this.session.release();
@@ -780,6 +926,14 @@ export class CameraStreamManager {
     if (this.previewOutput) {
       this.previewOutput.release();
       this.previewOutput = null;
+    }
+    if (this.detectionPreviewOutput) {
+      try { this.detectionPreviewOutput.release(); } catch (e) {}
+      this.detectionPreviewOutput = null;
+    }
+    if (this.imageReceiver) {
+      try { this.imageReceiver.release(); } catch (e) {}
+      this.imageReceiver = null;
     }
     this.cameraManager = null;
     this.previewReady = false;

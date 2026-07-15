@@ -380,6 +380,18 @@ export class RtspServer {
     });
   }
 
+  broadcastNotification(eventType: string, data: string): void {
+    const notification = `NOTIFY ${eventType} ${data}\r\n`;
+    console.info(`${TAG} broadcastNotification: ${notification.trim()}`);
+    this.clients.forEach((client: RtspClient) => {
+      if (!client.playing) return;
+      const buf = stringToArrayBuffer(notification);
+      client.connection.send({ data: buf }).catch((e: BusinessError) => {
+        console.error(`${TAG} broadcastNotification send failed: ${e.message}`);
+      });
+    });
+  }
+
   private sendNaluToClient(client: RtspClient, nalu: Uint8Array, timestamp: number): void {
     if (client.interleaved) {
       this.sendInterleavedRtp(client, nalu, timestamp);

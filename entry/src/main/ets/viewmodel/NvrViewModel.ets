@@ -1,7 +1,7 @@
 import { common, ConfigurationConstant, Want } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { image } from '@kit.ImageKit';
-import { fileIo } from '@kit.CoreFileKit';
+import { fileIo, Environment } from '@kit.CoreFileKit';
 import { CameraDevice, createCameraDevice } from '../model/CameraDevice';
 import { rstr, rstrNum } from '../utils/I18nUtils';
 import { RecordingFile, createRecordingFile } from '../model/RecordingFile';
@@ -99,9 +99,23 @@ export class NvrViewModel {
     const appLockEnabled = prefResults[11] as boolean;
     const gridColumns = prefResults[12] as number;
 
-    const initialStorage = savedStoragePath && savedStoragePath.trim() !== '' && savedStoragePath !== '/sdcard/NVR'
+    let defaultDocsPath: string;
+    try {
+      const userDocsDir = Environment.getUserDocumentDir();
+      defaultDocsPath = `${userDocsDir}/cams/data`;
+    } catch (e) {
+      console.error(`Environment.getUserDocumentDir failed: ${(e as Error).message}`);
+      defaultDocsPath = `${this.context.filesDir}/cams/data`;
+    }
+    const isFirstLaunch = !savedStoragePath || savedStoragePath.trim() === '';
+    const initialStorage = savedStoragePath && savedStoragePath.trim() !== '' && savedStoragePath !== '/sdcard/NVR' && savedStoragePath.startsWith('/')
       ? savedStoragePath
-      : this.context.filesDir;
+      : defaultDocsPath;
+
+    if (isFirstLaunch) {
+      await this.prefs.putString('storage_path', defaultDocsPath);
+      await this.ensureDefaultStorageMarker(defaultDocsPath);
+    }
 
     this.uiState.settings = {
         storagePathInput: initialStorage,
@@ -280,7 +294,7 @@ export class NvrViewModel {
   }
 
   async reloadSnapshots(): Promise<void> {
-    const rootPath = this.uiState.settings.storagePathInput.trim() || this.context.filesDir;
+    const rootPath = this.resolveStorageRoot();
     this.snapshots = this.storageManager.getAllSnapshots(rootPath);
   }
 
@@ -465,7 +479,7 @@ export class NvrViewModel {
       return false;
     }
     try {
-      const rootPath = this.uiState.settings.storagePathInput.trim() || this.context.filesDir;
+      const rootPath = this.resolveStorageRoot();
       const snapshotDir = this.storageManager.getSnapshotDirectoryPath(rootPath);
       const now = new Date();
       const dateFolder = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -676,6 +690,36 @@ export class NvrViewModel {
   }
   onDeviceFlowStepChange(v: DeviceFlowStep): void {
     this.uiState.deviceForm.deviceFlowStep = v;
+  }
+
+  private async ensureDefaultStorageMarker(dirPath: string): Promise<void> {
+    try {
+      const segments = dirPath.split('/').filter(s => s.length > 0);
+      let current = '';
+      for (const seg of segments) {
+        current = `${current}/${seg}`;
+        try {
+          fileIo.accessSync(current);
+        } catch {
+          fileIo.mkdirSync(current, true);
+        }
+      }
+      const markerPath = `${dirPath}/录像存放目录.txt`;
+      try {
+        fileIo.accessSync(markerPath);
+      } catch {
+        const file = await fileIo.open(markerPath, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE);
+        await fileIo.close(file);
+        console.info(`ensureDefaultStorageMarker: created '${markerPath}'`);
+      }
+    } catch (e) {
+      console.error(`ensureDefaultStorageMarker failed: ${(e as Error).message}`);
+    }
+  }
+
+  private resolveStorageRoot(): string {
+    const p = this.uiState.settings.storagePathInput.trim();
+    return p && p.startsWith('/') ? p : this.context.filesDir;
   }
 
   /* Settings fields */
