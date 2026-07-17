@@ -159,6 +159,62 @@ export struct ConfirmActionDialog {
 }
 
 @Component
+export struct FeedbackDialog {
+  accentColor: string = '#20B486';
+  onLater: () => void = () => {};
+  onRate: () => void = () => {};
+
+  build(): void {
+    Column() {
+      Text($r('app.string.dialog_feedback_title'))
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#1B1B1D')
+        .width('100%')
+        .padding({ top: 24, left: 24, right: 24 })
+
+      Text($r('app.string.dialog_feedback_message'))
+        .fontSize(14)
+        .fontColor('#6B6F76')
+        .width('100%')
+        .padding({ left: 24, right: 24, top: 12 })
+
+      Divider()
+        .color('#E5E5E5')
+        .margin({ top: 20 })
+
+      Row() {
+        Text($r('app.string.dialog_feedback_later'))
+          .fontSize(16)
+          .fontColor('#6B6F76')
+          .layoutWeight(1)
+          .textAlign(TextAlign.Center)
+          .padding({ top: 16, bottom: 16 })
+          .onClick(() => this.onLater())
+
+        Divider()
+          .vertical(true)
+          .color('#E5E5E5')
+          .height(48)
+
+        Text($r('app.string.dialog_feedback_rate'))
+          .fontSize(16)
+          .fontColor(this.accentColor)
+          .fontWeight(FontWeight.Medium)
+          .layoutWeight(1)
+          .textAlign(TextAlign.Center)
+          .padding({ top: 16, bottom: 16 })
+          .onClick(() => this.onRate())
+      }
+      .width('100%')
+    }
+    .width('80%')
+    .borderRadius(20)
+    .backgroundColor('#FFFFFF')
+  }
+}
+
+@Component
 export struct SetPinDialog {
   accentColor: string = '#20B486';
   errorColor: string = '#E53935';

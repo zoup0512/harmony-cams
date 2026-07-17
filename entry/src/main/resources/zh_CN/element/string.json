@@ -355,6 +355,10 @@
     { "name": "person_detection_idle", "value": "监控中" },
     { "name": "person_event_log", "value": "侦测事件" },
     { "name": "person_no_events", "value": "暂无事件" },
-    { "name": "scan_to_connect", "value": "扫码连接" }
+    { "name": "scan_to_connect", "value": "扫码连接" },
+    { "name": "dialog_feedback_title", "value": "体验反馈" },
+    { "name": "dialog_feedback_message", "value": "感谢各位长期的支持，如果感觉体验还不错的话不妨给个好评支持一下" },
+    { "name": "dialog_feedback_later", "value": "以后再说" },
+    { "name": "dialog_feedback_rate", "value": "去评价" }
   ]
 }

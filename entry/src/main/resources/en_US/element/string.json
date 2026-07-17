@@ -353,6 +353,10 @@
     { "name": "person_detection_idle", "value": "Monitoring" },
     { "name": "person_event_log", "value": "Detection Events" },
     { "name": "person_no_events", "value": "No events yet" },
-    { "name": "scan_to_connect", "value": "Scan to connect" }
+    { "name": "scan_to_connect", "value": "Scan to connect" },
+    { "name": "dialog_feedback_title", "value": "App Feedback" },
+    { "name": "dialog_feedback_message", "value": "Thanks for your continued support! If you enjoy the app, please consider leaving us a rating." },
+    { "name": "dialog_feedback_later", "value": "Later" },
+    { "name": "dialog_feedback_rate", "value": "Rate Now" }
   ]
 }

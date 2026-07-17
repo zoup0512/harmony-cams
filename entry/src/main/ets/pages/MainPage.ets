@@ -1,4 +1,4 @@
-import { common, ConfigurationConstant } from '@kit.AbilityKit';
+import { common, ConfigurationConstant, Want } from '@kit.AbilityKit';
 import { promptAction, window } from '@kit.ArkUI';
 import { picker } from '@kit.CoreFileKit';
 import { CameraDevice, cloneCameraDevice } from '../model/CameraDevice';
@@ -10,7 +10,7 @@ import { NvrMainTopBar, NvrBottomBar, CameraHomeScreen, PlaybackFullscreenScreen
 import { DeviceManageTopBar, AddCameraLandingScreen, AddCameraFormScreen, AddCameraVerificationScreen, ManufacturerPickerScreen } from '../components/DeviceManageComponents';
 import { BrowseScreen } from '../components/BrowseScreen';
 import { ActivityStreamScreen, SnapshotScreen, SettingsHomeScreen } from '../components/NvrSecondaryScreens';
-import { RecordingPreviewDialog, DeleteSnapshotConfirmDialog, ConfirmActionDialog, SetPinDialog } from '../components/NvrDialogComponents';
+import { RecordingPreviewDialog, DeleteSnapshotConfirmDialog, ConfirmActionDialog, SetPinDialog, FeedbackDialog } from '../components/NvrDialogComponents';
 import { NvrUiState, copyUiState } from '../viewmodel/NvrUiState';
 
 function safeShowToast(message: string): void {
@@ -97,6 +97,7 @@ struct MainPage {
   @State isInitializing: boolean = true;
   @State showSetPinDialog: boolean = false;
   @State pendingClearRecordingsConfirm: boolean = false;
+  @State showFeedbackDialog: boolean = false;
   private pollTimerId: number = -1;
   private controlsTimerId: number = -1;
   private videoPollTimerId: number = -1;
@@ -163,6 +164,35 @@ struct MainPage {
     this.isInitializing = false;
     this.startPlaybackPolling();
     this.vm.checkCameraHealth().then(() => this.syncState());
+    this.checkAndShowFeedback();
+  }
+
+  private async checkAndShowFeedback(): Promise<void> {
+    if (!this.vm) return;
+    const done = await this.vm.prefs.getBoolean('feedback_done', false);
+    if (done) return;
+    const count = await this.vm.prefs.getNumber('feedback_launch_count', 0) + 1;
+    if (count >= 3) {
+      await this.vm.prefs.putNumber('feedback_launch_count', 0);
+      this.showFeedbackDialog = true;
+    } else {
+      await this.vm.prefs.putNumber('feedback_launch_count', count);
+    }
+  }
+
+  private openAppMarket(): void {
+    if (!this.abilityContext) return;
+    try {
+      const want: Want = {
+        action: 'ohos.want.action.appdetail',
+        uri: 'market://details?id=com.razor.cams',
+      };
+      (this.abilityContext as common.UIAbilityContext).startAbility(want).catch((e: Error) => {
+        console.error('openAppMarket failed: ' + e.message);
+      });
+    } catch (e) {
+      console.error('openAppMarket error: ' + (e as Error).message);
+    }
   }
 
   private startPlaybackPolling(): void {
@@ -577,6 +607,25 @@ struct MainPage {
         .alignItems(HorizontalAlign.Center)
         .backgroundColor('#99000000')
         .onClick(() => { this.pendingClearRecordingsConfirm = false; })
+      }
+
+      if (this.showFeedbackDialog) {
+        Column() {
+          FeedbackDialog({
+            accentColor: this.colors.primary,
+            onLater: () => { this.showFeedbackDialog = false; },
+            onRate: () => {
+              this.showFeedbackDialog = false;
+              this.vm?.prefs.putBoolean('feedback_done', true);
+              this.openAppMarket();
+            },
+          })
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .backgroundColor('#99000000')
       }
     }
     .width('100%')
