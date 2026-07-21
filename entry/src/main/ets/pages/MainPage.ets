@@ -1,4 +1,4 @@
-import { common, ConfigurationConstant, Want } from '@kit.AbilityKit';
+import { bundleManager, common, ConfigurationConstant, Want } from '@kit.AbilityKit';
 import { promptAction, window } from '@kit.ArkUI';
 import { picker } from '@kit.CoreFileKit';
 import { CameraDevice, cloneCameraDevice } from '../model/CameraDevice';
@@ -169,6 +169,15 @@ struct MainPage {
 
   private async checkAndShowFeedback(): Promise<void> {
     if (!this.vm) return;
+    // debug 构建下不弹"反馈评价"弹窗，避免干扰开发调试
+    try {
+      const appInfo = bundleManager.getBundleInfoForSelfSync(
+        bundleManager.BundleFlag.GET_BUNDLE_INFO_WITH_APPLICATION
+      ).appInfo;
+      if (appInfo?.debug) return;
+    } catch (e) {
+      console.warn('checkAndShowFeedback: detect debug mode failed: ' + (e as Error).message);
+    }
     const done = await this.vm.prefs.getBoolean('feedback_done', false);
     if (done) return;
     const count = await this.vm.prefs.getNumber('feedback_launch_count', 0) + 1;
@@ -384,11 +393,15 @@ struct MainPage {
                     accentColor: this.colors.primary,
                     onPrimaryColor: this.colors.onPrimary,
                     surfaceVariantColor: this.colors.surfaceVariant,
+                    secondaryContainerColor: this.colors.secondaryContainer,
+                    errorColor: this.colors.error,
+                    outlineVariantColor: this.colors.outlineVariant,
                     rtmpUrlInput: this.uiState.settings.rtmpUrlInput,
                     rtmpStreamKeyInput: this.uiState.settings.rtmpStreamKeyInput,
                     rtmpUsernameInput: this.uiState.settings.rtmpUsernameInput,
                     rtmpPasswordInput: this.uiState.settings.rtmpPasswordInput,
                     onOpenRecording: (file: RecordingFile) => this.onOpenRecording(file),
+                    onRefreshRecordings: () => this.onRefreshRecordings(),
                   })
                 } else if (this.uiState.selectedTab === 3) {
                   SnapshotScreen({
@@ -918,6 +931,7 @@ struct MainPage {
         this.vm?.saveSnapshot(cameraId, cameraName).then(() => this.syncState());
       },
       onToggleRecord: () => { this.vm?.toggleRecording().then(() => this.syncState()); },
+      onMore: () => { safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_feature_coming_soon')); },
       onSwipeLeft: () => this.switchCamera(1),
       onSwipeRight: () => this.switchCamera(-1),
     })
@@ -1004,6 +1018,10 @@ struct MainPage {
     this.syncState();
   }
 
+  private onRefreshRecordings(): void {
+    this.vm?.reloadRecordings().then(() => this.syncState());
+  }
+
   private onDeleteSnapshot(file: RecordingFile): void {
     this.vm?.onPendingDeleteSnapshotChange(file);
     this.syncState();
@@ -1051,5 +1069,9 @@ struct MainPage {
         this.syncState();
       });
     });
+  }
+
+  private showPlaybackMoreMenu(): void {
+    safeShowToast(getContext(this).resourceManager.getStringByNameSync('toast_feature_coming_soon'));
   }
 }
